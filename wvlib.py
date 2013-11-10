@@ -60,7 +60,7 @@ import numpy
 import heapq
 
 from functools import partial
-from itertools import izip
+from itertools import tee, izip
 from collections import OrderedDict
 from StringIO import StringIO
 from types import StringTypes
@@ -110,6 +110,11 @@ class WVData(object):
         """Return list of words in the vocabulary."""
 
         return self.vocab.words()
+
+    def rank(self, w):
+        """Return rank (ordinal, 0-based) of word w in the vocabulary."""
+
+        return self.vocab.rank(w)
 
     def word_to_vector(self, w):
         """Return vector for given word.
@@ -529,10 +534,24 @@ class Vectors(object):
         else:
             with codecs.open(name, 'rb') as f:
                 return cls.loadf(f, format)
-    
+
 class Vocabulary(object):
     def __init__(self, word_freq):
+        assert not any((j for i, j in pairwise(word_freq) if i[1] < j[1])), \
+            'words not ordered by descending frequency'
         self.word_freq = OrderedDict(word_freq)
+        self._rank = None
+
+    def words(self):
+        return self.word_freq.keys()
+
+    def rank(self, w):
+        if self._rank is None:
+            self._rank = dict(((j, i) for i, j in enumerate(self.words())))
+        return self._rank[w]
+
+    def iterwords(self):
+        return self.word_freq.iterkeys()
 
     def to_rows(self):
         return self.word_freq.iteritems()
@@ -547,12 +566,6 @@ class Vocabulary(object):
 
         with codecs.open(name, 'wt', encoding=encoding) as f:
                 return self.savef(f)
-
-    def words(self):
-        return self.word_freq.keys()
-
-    def iterwords(self):
-        return self.word_freq.iterkeys()
 
     def __str__(self):
         return '\n'.join('\t'.join(str(i) for i in r) for r in self.to_rows())
@@ -846,8 +859,19 @@ def load(name, format=None):
     else:
         raise NotImplementedError        
 
+### misc. helper functions
+
+# from http://docs.python.org/2/library/itertools.html#recipes
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return izip(a, b)
+    
 def unit_vector(v):
     return v/numpy.linalg.norm(v)
+
+### CLI stuff
 
 def argparser():
     import argparse
