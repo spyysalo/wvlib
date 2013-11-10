@@ -163,24 +163,10 @@ class WVData(object):
 
         if self._normalized:
             return
+        self._invalidate()
         self.vectors.normalize()
         self._normalized = True
         return self
-
-    def __getitem__(self, key):
-        """Return vector for given word."""
-
-        return self.word_to_vector_mapping()[key]
-
-    def __getattr__(self, name):
-        # delegate access to nonexistent attributes to config
-        return getattr(self.config, name)
-
-    def __iter__(self):
-        """Iterate over (word, vector) pairs."""
-
-        #return izip(self.vocab.words(), self.vectors)
-        return izip(self.vocab.iterwords(), iter(self.vectors))
 
     def save(self, name, format=None):
         """Save in format to pathname name.
@@ -196,17 +182,6 @@ class WVData(object):
             return self.save_dir(name)
         else:
             raise NotImplementedError
-
-    @staticmethod
-    def _save_in_tar(tar, name, savef):
-        # helper for save_tar
-        i = tar.tarinfo(name)
-        s = StringIO()
-        savef(s)
-        s.seek(0)
-        i.size = s.len
-        i.mtime = time()
-        tar.addfile(i, s)
 
     def save_tar(self, name, mode=None):
         """Save in tar format to pathname name using mode.
@@ -241,6 +216,26 @@ class WVData(object):
         self.config.save(os.path.join(name, CONFIG_NAME))
         self.vocab.save(os.path.join(name, VOCAB_NAME))
         self.vectors.save(os.path.join(name, vecfile_name, vecformat))
+
+    def _invalidate(self):
+        """Invalidate cached values."""
+
+        self._w2v_map = None
+
+    def __getitem__(self, key):
+        """Return vector for given word."""
+
+        return self.word_to_vector_mapping()[key]
+
+    def __getattr__(self, name):
+        # delegate access to nonexistent attributes to config
+        return getattr(self.config, name)
+
+    def __iter__(self):
+        """Iterate over (word, vector) pairs."""
+
+        #return izip(self.vocab.words(), self.vectors)
+        return izip(self.vocab.iterwords(), iter(self.vectors))
 
     @classmethod
     def load(cls, name):
@@ -302,6 +297,17 @@ class WVData(object):
         vocab = Vocabulary.loadf(coll.extractfile(vocabname))
         vectors = Vectors.loadf(coll.extractfile(vecname), config.format)
         return cls(config, vocab, vectors)
+
+    @staticmethod
+    def _save_in_tar(tar, name, savef):
+        # helper for save_tar
+        i = tar.tarinfo(name)
+        s = StringIO()
+        savef(s)
+        s.seek(0)
+        i.size = s.len
+        i.mtime = time()
+        tar.addfile(i, s)
 
     @staticmethod
     def _item_similarity(i, v):
