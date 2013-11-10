@@ -174,7 +174,7 @@ def prec_rec_F(TPp, TPg, FP, FN):
     return p, r, F
 
 def report(TPp, TPg, FP, FN, header=None, out=sys.stdout):
-    p, r, F = prec_rec_F(TPg, TPp, FP, FN)
+    p, r, F = prec_rec_F(TPp, TPg, FP, FN)
     if header is not None:
         out.write(header)
     print >> out, "precision %.2f%% (%d/%d) recall %.2f%% (%d/%d) F %.2f%%" % \
