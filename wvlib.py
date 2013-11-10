@@ -779,11 +779,11 @@ def load(name, format=None):
     """
 
     if not os.path.exists(name):
-        raise IOError('no such file or directory')
+        raise IOError('no such file or directory: %s' % name)
     if format is None:
         format = _guess_format(name)
     if format is None:
-        raise FormatError('failed to guess format')
+        raise FormatError('failed to guess format: %s' % name)
 
     logging.info('reading %s as %s' % (name, format))
 
