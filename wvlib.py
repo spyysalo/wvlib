@@ -68,7 +68,7 @@ from time import time
 try:
     from collections import OrderedDict
 except ImportError:
-    from compat import OrderedDict
+    from compat.ordereddict import OrderedDict
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -880,7 +880,10 @@ def unit_vector(v):
 ### CLI stuff
 
 def argparser():
-    import argparse
+    try:
+        import argparse
+    except ImportError:
+        import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
     ap.add_argument('vectors', metavar='FILE', help='vectors to load')

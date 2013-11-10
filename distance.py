@@ -17,7 +17,10 @@ import wvlib
 output_header = "\n                                              Word       Cosine distance\n------------------------------------------------------------------------"
 
 def argparser():
-    import argparse
+    try:
+        import argparse
+    except ImportError:
+        import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
     ap.add_argument('vectors', nargs=1, metavar='FILE', help='word vectors')

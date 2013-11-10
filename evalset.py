@@ -26,7 +26,10 @@ NEAREST_RESPONSE_RE = re.compile(r'^(\S[^\t]*?)\t((?:\d*\.)?\d+)$')
 verbose = True
 
 def argparser():
-    import argparse
+    try:
+        import argparse
+    except ImportError:
+        import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
     ap.add_argument('-l', '--list', default=False, action='store_true',
