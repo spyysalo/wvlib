@@ -88,6 +88,7 @@ extension_format_map = {
     '.tar' : WVLIB_FORMAT,
     '.tgz' : WVLIB_FORMAT,
     '.tar.gz' : WVLIB_FORMAT,
+    '.tar.bz2' : WVLIB_FORMAT,
 }
 
 formats = sorted(list(set(extension_format_map.values())))
