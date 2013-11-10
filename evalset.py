@@ -297,7 +297,7 @@ def evaluate_sets(infn, word_sets, options):
 
     # set number of neighbors retrieved heuristically based on the
     # number of targets in the largest set
-    nncount = 2 * max(len(targets) for targets, accept, name in word_sets)
+    nncount = 5 * max(len(targets) for targets, accept, name in word_sets)
 
     if options.list:
         nearest = read_nearest_lists(infn)
