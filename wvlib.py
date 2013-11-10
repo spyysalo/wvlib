@@ -741,8 +741,9 @@ class Word2VecData(WVData):
         """Read line from file-like object f as word2vec format
         header, return (word count, vector size)."""
         
+        l = f.readline().rstrip('\n')
         try:
-            wcount, vsize = f.readline().rstrip('\n').split()
+            wcount, vsize = l.split()
             return int(wcount), int(vsize)
         except ValueError:
             raise FormatError('expected two ints, got "%s"' % l)
