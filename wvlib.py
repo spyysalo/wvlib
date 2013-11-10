@@ -174,9 +174,11 @@ class WVData(object):
             v1, v2 = v1/numpy.linalg.norm(v1), v2/numpy.linalg.norm(v2)
         return numpy.dot(v1, v2)
 
-    def nearest(self, v, n=10):
-        """Return nearest n words and similarities for given word or vector.
+    def nearest(self, v, n=10, exclude=None):
+        """Return nearest n words and similarities for given word or vector,
+        excluding given words.
 
+        If exclude is None and v is a string, exclude v.
         If v is a string, look up the corresponding word vector.
         Return value is a list of (word, similarity) pairs.
         """
@@ -186,14 +188,14 @@ class WVData(object):
             v, w = self.word_to_unit_vector(v), v
         else:
             v, w = v/numpy.linalg.norm(v), None
+        if exclude is None and w is not None:
+            exclude = set([w])
         if not self._normalized:
             sim = partial(self._item_similarity, v=v)
         else:
             sim = partial(self._item_similarity_normalized, v=v)
-        # +1 for the input itself if a word
-        m = n + 1 if w is not None else n
-        nearest = heapq.nlargest(m, w2v.iteritems(), sim)
-        return [(n[0], sim(n)) for n in nearest if n[0] != w]
+        nearest = heapq.nlargest(n+len(exclude), w2v.iteritems(), sim)
+        return [(n[0], sim(n)) for n in nearest if n[0] not in exclude]
 
     def normalize(self):
         """Normalize word vectors.
@@ -843,6 +845,9 @@ def load(name, format=None):
         return Word2VecData.load_binary(name)
     else:
         raise NotImplementedError        
+
+def unit_vector(v):
+    return v/numpy.linalg.norm(v)
 
 def argparser():
     import argparse
