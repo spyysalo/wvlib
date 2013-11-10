@@ -263,10 +263,15 @@ class WVData(object):
 
         self._w2v_map = None
 
-    def __getitem__(self, key):
+    def __getitem__(self, word):
         """Return vector for given word."""
 
-        return self.word_to_vector_mapping()[key]
+        return self.word_to_vector_mapping()[word]
+
+    def __contains__(self, word):
+        """Return True iff given word is in vocabulary (has vector)."""
+
+        return word in self.word_to_vector_mapping()
 
     def __getattr__(self, name):
         # delegate access to nonexistent attributes to config
