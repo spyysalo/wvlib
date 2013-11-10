@@ -61,10 +61,14 @@ import heapq
 
 from functools import partial
 from itertools import tee, izip
-from collections import OrderedDict
 from StringIO import StringIO
 from types import StringTypes
 from time import time
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    from compat import OrderedDict
 
 logging.getLogger().setLevel(logging.DEBUG)
 
