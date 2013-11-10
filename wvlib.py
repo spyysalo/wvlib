@@ -778,10 +778,11 @@ def load(name, format=None):
     If format is None, determine format heuristically.
     """
 
+    if not os.path.exists(name):
+        raise IOError('no such file or directory')
     if format is None:
         format = _guess_format(name)
     if format is None:
-        # TODO more appropriate exception
         raise FormatError('failed to guess format')
 
     logging.info('reading %s as %s' % (name, format))
