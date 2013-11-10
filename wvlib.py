@@ -35,17 +35,17 @@ Load word2vec vectors from "vectors.bin", save in wvlib format in
 Load word vectors from name, compare similarity of two words:
 
 >>> import wvlib
->>> wv = wvlib.load(name)
->>> wv.word_similarity("dog", "cat")
+>>> wv = wvlib.load("vectors.bin")
+>>> wv.similarity("dog", "cat")
 
 Load word vectors, normalize, and find words nearest to given word:
 
 >>> import wvlib
->>> wv = wvlib.load(name).normalize()
+>>> wv = wvlib.load("vectors.bin").normalize()
 >>> wv.nearest("dog")
 
-normalize() irreversibly alters the word vectors, but considerably
-speeds up calculations using word vector similarity.
+(normalize() irreversibly alters the word vectors, but considerably
+speeds up calculations using word vector similarity.)
 """
 
 import sys
@@ -63,6 +63,7 @@ from functools import partial
 from itertools import izip
 from collections import OrderedDict
 from StringIO import StringIO
+from types import StringTypes
 from time import time
 
 logging.getLogger().setLevel(logging.DEBUG)
@@ -118,6 +119,19 @@ class WVData(object):
         
         return self.word_to_vector_mapping()[w]
 
+    def word_to_unit_vector(self, w):
+        """Return unit (normalized) vector for given word.
+
+        For large numbers of queries, consider normalize() and
+        word_to_vector_mapping().
+        """
+
+        v = self.word_to_vector_mapping()[w]
+        if self._normalized:
+            return v
+        else:
+            return v/numpy.linalg.norm(v)
+
     def word_to_vector_mapping(self):
         """Return dict mapping from words to vectors.
 
@@ -129,12 +143,29 @@ class WVData(object):
             self._w2v_map = dict(iter(self))
         return self._w2v_map
 
+    def similarity(self, v1, v2):
+        """Return cosine similarity of given words or vectors.
+
+        If v1/v2 is a string, look up the corresponding word vector.
+        This is not particularly efficient function. Instead of many
+        invocations, consider word_similarity() or direct computation.
+        """
+        
+        vs = [v1, v2]
+        for i, v in enumerate(vs):
+            if isinstance(v, StringTypes):
+                v = self.word_to_unit_vector(v)
+            else:
+                v = v/numpy.linalg.norm(v) # costly but safe
+            vs[i] = v
+        return numpy.dot(vs[0], vs[1])
+
     def word_similarity(self, w1, w2):
         """Return cosine similarity of vectors for given words.
 
-        In cases involving many invocations of this function, consider
-        calling normalize() first to avoid repeatedly normalizing the
-        same vectors.
+        For many invocations of this function, consider calling
+        normalize() first to avoid repeatedly normalizing the same
+        vectors.
         """
 
         w2v = self.word_to_vector_mapping()
@@ -143,15 +174,25 @@ class WVData(object):
             v1, v2 = v1/numpy.linalg.norm(v1), v2/numpy.linalg.norm(v2)
         return numpy.dot(v1, v2)
 
-    def nearest(self, w, n=10):
+    def nearest(self, v, n=10):
+        """Return nearest n words and similarities for given word or vector.
+
+        If v is a string, look up the corresponding word vector.
+        Return value is a list of (word, similarity) pairs.
+        """
+
         w2v = self.word_to_vector_mapping()
-        v = w2v[w]/numpy.linalg.norm(w2v[w])
+        if isinstance(v, StringTypes):
+            v, w = self.word_to_unit_vector(v), v
+        else:
+            v, w = v/numpy.linalg.norm(v), None
         if not self._normalized:
             sim = partial(self._item_similarity, v=v)
         else:
             sim = partial(self._item_similarity_normalized, v=v)
-        # +1 for the input itself
-        nearest = heapq.nlargest(n+1, w2v.iteritems(), sim)
+        # +1 for the input itself if a word
+        m = n + 1 if w is not None else n
+        nearest = heapq.nlargest(m, w2v.iteritems(), sim)
         return [(n[0], sim(n)) for n in nearest if n[0] != w]
 
     def normalize(self):
