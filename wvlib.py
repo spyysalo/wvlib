@@ -129,6 +129,12 @@ class WVData(object):
         
         return self.word_to_vector_mapping()[w]
 
+    def words_to_vector(self, words):
+        """Return average vector for given words."""
+
+        w2v = self.word_to_vector_mapping()
+        return sum(w2v[w] for w in words)/len(words)
+
     def word_to_unit_vector(self, w):
         """Return unit (normalized) vector for given word.
 
