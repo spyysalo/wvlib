@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """Given words w1, w2 and w3, find nearest neighbors to
-vec(w2)-vec(w1)+vec(w2) in given word representation.
+vec(w2)-vec(w1)+vec(w3) in given word representation.
 
 This is a python + wvlib version of word-analogy.c from word2vec
 (https://code.google.com/p/word2vec/). The primary differences to
