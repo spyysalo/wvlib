@@ -34,17 +34,17 @@ def argparser():
                     help='don\'t exit on input "EXIT"')
     return ap
 
-def process_arguments(argv):
+def process_arguments(argv, prompt='Enter words'):
     options = argparser().parse_args(argv[1:])
     if options.quiet:
         options.prompt = ''
     elif options.no_exit:
-        options.prompt = 'Enter words (CTRL-D to break):\n'
+        options.prompt = prompt + ' (CTRL-D to break):\n'
     else:
-        options.prompt = 'Enter words (EXIT or CTRL-D to break):\n'    
+        options.prompt = prompt + ' (EXIT or CTRL-D to break):\n'    
     return wvlib.load(options.vectors[0]).normalize(), options
 
-def query_vector(wv, words, options):
+def words_to_vector_average(wv, words, options):
     vectors = []
     for w in words:
         if w in wv:
@@ -68,16 +68,18 @@ def output_nearest(nearest, options, out=sys.stdout):
         print >> out, fmt % (w, s)
     print >> out
 
-def process_query(wv, query, options):
+def process_query(wv, query, options, words_to_vector=None):
+    if words_to_vector is None:
+        words_to_vector = words_to_vector_average
     words = query.split()
-    v = query_vector(wv, words, options)
+    v = words_to_vector(wv, words, options)
     if v is not None:
         nearest = wv.nearest(v, n=options.number, exclude=words)
         output_nearest(nearest, options)
     else:
         pass
 
-def query_loop(wv, options):
+def query_loop(wv, options, words_to_vector=None):
     while True:
         try:
             s = raw_input(options.prompt)
@@ -87,7 +89,7 @@ def query_loop(wv, options):
             return 0
         if options.echo:
             print s
-        process_query(wv, s, options)
+        process_query(wv, s, options, words_to_vector)
 
 def main(argv=None):
     if argv is None:
