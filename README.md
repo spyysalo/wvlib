@@ -8,6 +8,11 @@ the text8 demo data
 
     echo protein | python distance.py text8.tar.gz -n 10
 
+Find word that has the same relationship to "japan" as "paris" has
+to "france"
+
+    echo 'france paris japan' | python analogy.py text8.tar.gz -q -n 1
+
 Evaluate the vectors on the binary classification task using words
 from McIntosh and Curran "Reducing semantic drift with bagging and
 distributional similarity" (ACL 2009)
