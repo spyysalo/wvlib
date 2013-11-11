@@ -205,7 +205,8 @@ class WVData(object):
         else:
             sim = partial(self._item_similarity_normalized, v=v)
         nearest = heapq.nlargest(n+len(exclude), w2v.iteritems(), sim)
-        return [(n[0], sim(n)) for n in nearest if n[0] not in exclude]
+        wordsim = [(p[0], sim(p)) for p in nearest if p[0] not in exclude]
+        return wordsim[:n]
 
     def normalize(self):
         """Normalize word vectors.
