@@ -26,7 +26,10 @@ NEAREST_RESPONSE_RE = re.compile(r'^(\S[^\t]*?)\t((?:\d*\.)?\d+)$')
 verbose = True
 
 def argparser():
-    import argparse
+    try:
+        import argparse
+    except ImportError:
+        import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
     ap.add_argument('-l', '--list', default=False, action='store_true',
@@ -171,7 +174,7 @@ def prec_rec_F(TPp, TPg, FP, FN):
     return p, r, F
 
 def report(TPp, TPg, FP, FN, header=None, out=sys.stdout):
-    p, r, F = prec_rec_F(TPg, TPp, FP, FN)
+    p, r, F = prec_rec_F(TPp, TPg, FP, FN)
     if header is not None:
         out.write(header)
     print >> out, "precision %.2f%% (%d/%d) recall %.2f%% (%d/%d) F %.2f%%" % \
@@ -294,7 +297,7 @@ def evaluate_sets(infn, word_sets, options):
 
     # set number of neighbors retrieved heuristically based on the
     # number of targets in the largest set
-    nncount = 2 * max(len(targets) for targets, accept, name in word_sets)
+    nncount = 5 * max(len(targets) for targets, accept, name in word_sets)
 
     if options.list:
         nearest = read_nearest_lists(infn)

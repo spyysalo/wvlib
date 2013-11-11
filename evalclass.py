@@ -32,7 +32,10 @@ import wvlib
 ENCODING = 'UTF-8'
 
 def argparser():
-    import argparse
+    try:
+        import argparse
+    except ImportError:
+        import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
     ap.add_argument('vectors', nargs=1, help='word2vec word vectors')
