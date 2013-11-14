@@ -199,7 +199,8 @@ class WVData(object):
         Return value is a list of (word, similarity) pairs.
         """
 
-        w2v = self.word_to_vector_mapping()
+        if exclude is None:
+            exclude = []
         if isinstance(v, StringTypes):
             v, w = self.word_to_unit_vector(v), v
         else:
@@ -210,6 +211,7 @@ class WVData(object):
             sim = partial(self._item_similarity, v=v)
         else:
             sim = partial(self._item_similarity_normalized, v=v)
+        w2v = self.word_to_vector_mapping()
         nearest = heapq.nlargest(n+len(exclude), w2v.iteritems(), sim)
         wordsim = [(p[0], sim(p)) for p in nearest if p[0] not in exclude]
         return wordsim[:n]
