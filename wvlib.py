@@ -32,20 +32,29 @@ Load word2vec vectors from "vectors.bin", save in wvlib format in
 >>> wv = wvlib.load("vectors.bin")
 >>> wv.save("vectors.tar.gz")
 
-Load word vectors from name, compare similarity of two words:
+Load word vectors and compare similarity of two words:
 
 >>> import wvlib
->>> wv = wvlib.load("vectors.bin")
+>>> wv = wvlib.load("text8.tar.gz")
 >>> wv.similarity("dog", "cat")
 
 Load word vectors, normalize, and find words nearest to given word:
 
 >>> import wvlib
->>> wv = wvlib.load("vectors.bin").normalize()
+>>> wv = wvlib.load("text8.tar.gz").normalize()
 >>> wv.nearest("dog")
 
 (normalize() irreversibly alters the word vectors, but considerably
 speeds up calculations using word vector similarity.)
+
+Load word vectors, normalize, and find word that has the same
+relationship to "japan" as "paris" has to "france" (see https://code.google.com/p/word2vec/#Interesting_properties_of_the_word_vectors).
+
+>>> import wvlib
+>>> wv = wvlib.load("text8.tar.gz").normalize()
+>>> v = wv["paris"] - wv["france"] + wv["japan"]
+>>> wv.nearest(v)[0]
+
 """
 
 import sys
