@@ -518,10 +518,12 @@ class Vectors(object):
         """Return Vectors from file-like object f in TSV."""
 
         rows = []
-        for l in f:
+        for i, l in enumerate(f):
             #row = [float(i) for i in l.rstrip('\n').split()]
             row = numpy.fromstring(l, sep='\t')
             rows.append(row)
+            if (i+1) % 10000 == 0:
+                logging.debug('read %d TSV rows' % (i+1))
         return cls.from_rows(rows)
 
     @classmethod
