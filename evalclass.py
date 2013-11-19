@@ -38,6 +38,7 @@ def argparser():
         import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
+    ap.add_argument('-q', '--quiet', default=False, action='store_true')
     ap.add_argument('vectors', nargs=1, help='word2vec word vectors')
     ap.add_argument('wordset', nargs='+', help='word sets', metavar='FILE')
     return ap
@@ -83,7 +84,7 @@ def closer(w1, w2, w, w2v):
     else:
         return SECOND
 
-def compare_sets(set1, name1, set2, name2, w2v):
+def compare_sets(set1, name1, set2, name2, w2v, options=None):
     total, correct = 0, 0
     for w1 in set1:
         for w2 in set2:
@@ -101,8 +102,9 @@ def compare_sets(set1, name1, set2, name2, w2v):
         return None
     else:
         avg = 1.*correct/total
-        print 'AVERAGE %s - %s: %.2f%% (%d/%d)' % \
-            (name1, name2, 100*avg, correct, total)
+        if not options or not options.quiet:
+            print 'AVERAGE %s - %s: %.2f%% (%d/%d)' % \
+                (name1, name2, 100*avg, correct, total)
         return avg
         
 def main(argv=None):
@@ -110,6 +112,9 @@ def main(argv=None):
         argv = sys.argv
 
     options = argparser().parse_args(argv[1:])
+
+    if options.quiet:
+        logging.getLogger().setLevel(logging.ERROR)
 
     wordsets = read_wordsets(options.wordset)
 
@@ -141,16 +146,17 @@ def main(argv=None):
 
     results = []
     for n1, n2 in combinations(wordsets.keys(), 2):
-        result = compare_sets(wordsets[n1], n1, wordsets[n2], n2, w2v)
+        result = compare_sets(wordsets[n1], n1, wordsets[n2], n2, w2v, options)
         if result is not None:
             results.append(result)
 
-    print >> sys.stderr, 'out of vocabulary %d/%d (%.2f%%)' % \
-        (oov_count, word_count, 100.*oov_count/word_count)
+    if not options.quiet:
+        print >> sys.stderr, 'out of vocabulary %d/%d (%.2f%%)' % \
+            (oov_count, word_count, 100.*oov_count/word_count)
 
     if results:
-        print 'OVERALL AVERAGE (macro): %.2f%%' % \
-            (100*sum(results)/len(results))
+        print 'OVERALL AVERAGE (macro):\t%.2f%%\t(%.2f%% OOV)' % \
+            (100*sum(results)/len(results), 100.*oov_count/word_count)
     else:
         print >> sys.stderr, 'All comparisons failed!'
 
