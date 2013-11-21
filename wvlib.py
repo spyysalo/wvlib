@@ -14,6 +14,8 @@ Variables:
 
 formats -- list of formats recognized by load().
 
+vector_formats -- list of vector formats recognized by WVData.save()
+
 Functions:
 
 load() -- load word vectors from a file in a supported input format.
@@ -55,6 +57,11 @@ relationship to "japan" as "paris" has to "france" (see https://code.google.com/
 >>> v = wv["paris"] - wv["france"] + wv["japan"]
 >>> wv.nearest(v)[0]
 
+Load word vectors and save with vectors in TSV format:
+
+>>> import wvlib
+>>> wv = wvlib.load("text8.tar.gz")
+>>> wv.save("text8-tsv.tar.gz", vector_format="tsv")
 """
 
 import sys
@@ -104,13 +111,20 @@ extension_format_map = {
     '.tar.bz2' : WVLIB_FORMAT,
 }
 
+# supported vector formats and filename extensions
+NUMPY_FORMAT = 'npy'
+TSV_FORMAT = 'tsv'
+
 formats = sorted(list(set(extension_format_map.values())))
+
+vector_formats = sorted([NUMPY_FORMAT, TSV_FORMAT])
 
 class FormatError(Exception):
     pass
 
 class WVData(object):
-    TAR, DIR = range(2)
+    TAR = 'tar'
+    DIR = 'dir'
 
     def __init__(self, config, vocab, vectors):
         # TODO: check config-vocab-vectors consistency
@@ -239,20 +253,34 @@ class WVData(object):
         self._normalized = True
         return self
 
-    def save(self, name, format=None):
+    def save(self, name, format=None, vector_format=None):
         """Save in format to pathname name.
 
         If format is None, determine format heuristically.
+        If vector_format is not None, save vectors in vector_format
+        instead of currently set format (config.format).
         """
 
-        if format is None:
-            format = self.guess_format(name)
-        if format == self.TAR:
-            return self.save_tar(name)
-        elif format == self.DIR:
-            return self.save_dir(name)
-        else:
-            raise NotImplementedError
+        vf = self.config.format
+        try:
+            if vector_format is not None:
+                self.config.format = vector_format
+            if format is None:
+                format = self.guess_format(name)
+            if format is None:
+                raise ArgumentError('failed to guess format for %s' % name)
+
+            logging.info('saving %s as %s with %s vectors' % 
+                         (name, format, self.config.format))
+
+            if format == self.TAR:
+                return self.save_tar(name)
+            elif format == self.DIR:
+                return self.save_dir(name)
+            else:
+                raise NotImplementedError
+        finally:
+            self.config.format = vf
 
     def save_tar(self, name, mode=None):
         """Save in tar format to pathname name using mode.
@@ -444,8 +472,7 @@ class _Directory(object):
 
 class Vectors(object):
 
-    default_format = 'npy'
-    _text_format = set(['tsv'])
+    default_format = NUMPY_FORMAT
     
     def __init__(self, vectors):
         self.vectors = vectors
@@ -470,9 +497,9 @@ class Vectors(object):
     def savef(self, f, format):
         """Save in format to file-like object f."""
 
-        if format == 'tsv':
+        if format == TSV_FORMAT:
             return self.save_tsv(f)
-        elif format == 'npy':
+        elif format == NUMPY_FORMAT:
             return numpy.save(f, self.vectors)
         else:
             raise NotImplementedError(format)
@@ -536,9 +563,9 @@ class Vectors(object):
     def loadf(cls, f, format):
         """Return Vectors from file-like object f in format."""
 
-        if format == 'tsv':
+        if format == TSV_FORMAT:
             return cls.load_tsv(f)
-        elif format == 'npy':
+        elif format == NUMPY_FORMAT:
             return cls.load_numpy(f)
         else:
             raise NotImplementedError(format)
@@ -553,12 +580,21 @@ class Vectors(object):
         if format is None:
             format = os.path.splitext(name)[1].replace('.', '')
 
-        if format in Vectors._text_format:
+        if Vectors.is_text_format(format):
             with codecs.open(name, 'rt', encoding=encoding) as f:
                 return cls.loadf(f, format)
         else:
             with codecs.open(name, 'rb') as f:
                 return cls.loadf(f, format)
+
+    @staticmethod
+    def is_text_format(format):
+        if format == TSV_FORMAT:
+            return True
+        elif format == NUMPY_FORMAT:
+            return False
+        else:
+            raise ArgumentError('Unknown format %s' % format)
 
 class Vocabulary(object):
     def __init__(self, word_freq):
@@ -872,7 +908,7 @@ def load(name, format=None):
     if format is None:
         raise FormatError('failed to guess format: %s' % name)
 
-    logging.info('reading %s as %s' % (name, format))
+    logging.info('loading %s as %s' % (name, format))
 
     if format == WVLIB_FORMAT:
         return WVData.load(name)
@@ -907,7 +943,11 @@ def argparser():
 
     ap=argparse.ArgumentParser()
     ap.add_argument('vectors', metavar='FILE', help='vectors to load')
-    ap.add_argument('-f', '--format', default=None, choices=formats)
+    ap.add_argument('-f', '--format', default=None, choices=formats,
+                    help='input FILE format')
+    ap.add_argument('-v', '--vector_format', default=None, 
+                    choices=vector_formats,
+                    help='output vector format (with -o)')
     ap.add_argument('-o', '--output', metavar='FILE/DIR', default=None,
                     help='save vectors to file or directory')
     ap.add_argument('-n', '--nearest', metavar='WORD', default=None,
@@ -926,7 +966,7 @@ def main(argv=None):
         print '\n'.join(str(n) for n in wv.nearest(options.nearest))
 
     if options.output:
-        wv.save(options.output)
+        wv.save(options.output, vector_format=options.vector_format)
 
     return 0
 
