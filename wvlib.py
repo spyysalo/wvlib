@@ -589,9 +589,17 @@ class Vectors(object):
 
         If max_rank is not None, only load max_rank first vectors."""
 
+        # NOTE: the bit below would be better but doesn't work, as mmap 
+        # cannot use existing file handles.
+        # if max_rank is not None:
+        #     return cls(numpy.array(numpy.load(f, mmap_mode='r')[:max_rank]))
+
+        v = cls(numpy.load(f))
         if max_rank is not None:
-            logging.warning('max_rank filter not implemented for npy data')
-        return cls(numpy.load(f))
+            # see comment above
+            logging.debug('note: full numpy.load() despite max_rank')
+            v.shrink(max_rank)
+        return v
 
     @classmethod
     def loadf(cls, f, format, max_rank=None):
