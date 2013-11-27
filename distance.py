@@ -141,8 +141,10 @@ def main(argv=None):
     try:
         wv, options = process_options(argv[1:])
     except Exception, e:
-        print >> sys.stderr, 'Error: %s' % str(e)
-        return 1
+        if str(e):
+            print >> sys.stderr, 'Error: %s' % str(e)
+        else:
+            raise
     return query_loop(wv, options)
 
 if __name__ == '__main__':
