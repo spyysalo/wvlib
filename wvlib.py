@@ -76,7 +76,7 @@ import numpy
 import heapq
 
 from functools import partial
-from itertools import tee, izip
+from itertools import tee, izip, islice
 from StringIO import StringIO
 from types import StringTypes
 from time import time
@@ -256,8 +256,11 @@ class WVData(object):
     def filter_by_rank(self, r):
         """Discard vectors for words other than the r most frequent."""
         
-        self._invalidate()
-        self.vectors.shrink(r)
+        if r < self.config.word_count:
+            self._invalidate()
+            self.config.word_count = r
+            self.vocab.shrink(r)
+            self.vectors.shrink(r)
 
     def save(self, name, format=None, vector_format=None):
         """Save in format to pathname name.
@@ -628,6 +631,12 @@ class Vocabulary(object):
             self._rank = dict(((j, i) for i, j in enumerate(self.words())))
         return self._rank[w]
 
+    def shrink(self, s):
+        """Discard words other than the first s."""
+
+        self._invalidate()
+        self.word_freq = OrderedDict(islice(self.word_freq.iteritems(), s))
+
     def iterwords(self):
         return self.word_freq.iterkeys()
 
@@ -644,6 +653,11 @@ class Vocabulary(object):
 
         with codecs.open(name, 'wt', encoding=encoding) as f:
                 return self.savef(f)
+
+    def _invalidate(self):
+        """Invalidate cached values."""
+
+        self._rank = None
 
     def __str__(self):
         return '\n'.join('\t'.join(str(i) for i in r) for r in self.to_rows())
