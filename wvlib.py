@@ -783,18 +783,24 @@ class Word2VecData(WVData):
         self.w2vdata = data
 
     @classmethod
-    def load_textf(cls, f):
+    def load_textf(cls, f, max_rank=None):
         """Return Word2VecData from file-like object f in the word2vec
-        text format."""
+        text format.
 
-        return cls(cls.read(f, cls.read_text_line))
+        If max_rank is not None, only load max_rank most frequent words.
+        """
+
+        return cls(cls.read(f, cls.read_text_line, max_rank=max_rank))
 
     @classmethod
-    def load_binaryf(cls, f):
+    def load_binaryf(cls, f, max_rank=None):
         """Return Word2VecData from file-like object f in the word2vec
-        binary format."""
+        binary format.
 
-        return cls(cls.read(f, cls.read_binary_line))
+        If max_rank is not None, only load max_rank most frequent words.
+        """
+
+        return cls(cls.read(f, cls.read_binary_line, max_rank=max_rank))
 
     @classmethod
     def load_binary(cls, name, max_rank=None):
@@ -805,10 +811,7 @@ class Word2VecData(WVData):
         """
 
         with open(name, 'rb') as f:
-            wv = cls.load_binaryf(f)
-        if max_rank is not None:
-            wv.filter_by_rank(max_rank)
-        return wv
+            return cls.load_binaryf(f, max_rank)
 
     @classmethod
     def load_text(cls, name, encoding=DEFAULT_ENCODING, max_rank=None):
@@ -819,10 +822,7 @@ class Word2VecData(WVData):
         """
 
         with codecs.open(name, 'rU', encoding=encoding) as f:
-            wv = cls.load_textf(f)
-        if max_rank is not None:
-            wv.filter_by_rank(max_rank)
-        return wv
+            return cls.load_textf(f, max_rank)
     
     @classmethod
     def load(cls, name, binary=None, encoding=DEFAULT_ENCODING, max_rank=None):
@@ -896,15 +896,18 @@ class Word2VecData(WVData):
         return word, vector
 
     @staticmethod
-    def read(f, read_line=read_binary_line):
+    def read(f, read_line=read_binary_line, max_rank=None):
         """Read word2vec data from file-like object f using function
         read_line to parse individual lines. 
 
         Return list of (word, vector) pairs.
+        If max_rank is not None, only load max_rank most frequent words.
         """
         
         wcount, vsize = Word2VecData.read_size_line(f)
         rows = []
+        if max_rank is not None and wcount > max_rank:
+            wcount = max_rank
         for i in range(wcount):
             rows.append(read_line(f, vsize))
         if len(rows) != wcount:
