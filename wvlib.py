@@ -359,9 +359,9 @@ class WVData(object):
 
         format = cls.guess_format(name)
         if format == cls.TAR:
-            wv = cls.load_tar(name)
+            wv = cls.load_tar(name, max_rank=max_rank)
         elif format == cls.DIR:
-            wv = cls.load_dir(name)
+            wv = cls.load_dir(name, max_rank=max_rank)
         else:
             raise NotImplementedError
         if max_rank is not None:
@@ -369,27 +369,31 @@ class WVData(object):
         return wv
             
     @classmethod
-    def load_tar(cls, name):
-        """Return WVData from tar or tar.gz name."""
+    def load_tar(cls, name, max_rank=None):
+        """Return WVData from tar or tar.gz name.
+
+        If max_rank is not None, only load max_rank most frequent words."""
 
         f = tarfile.open(name, 'r')
         try:
-            return cls._load_collection(f)
+            return cls._load_collection(f, max_rank=max_rank)
         finally:            
             f.close()
 
     @classmethod
-    def load_dir(cls, name):
-        """Return WVData from directory name."""
+    def load_dir(cls, name, max_rank=None):
+        """Return WVData from directory name.
+
+        If max_rank is not None, only load max_rank most frequent words."""
 
         d = _Directory.open(name, 'r')
         try:
-            return cls._load_collection(d)
+            return cls._load_collection(d, max_rank=max_rank)
         finally:
             d.close()
 
     @classmethod
-    def _load_collection(cls, coll):
+    def _load_collection(cls, coll, max_rank=None):
         # abstracts over tar and directory
         confname, vocabname, vecname = None, None, None
         for i in coll:
@@ -413,8 +417,10 @@ class WVData(object):
             if i is None:
                 raise FormatError('missing %s' % n)
         config = Config.loadf(coll.extractfile(confname))
-        vocab = Vocabulary.loadf(coll.extractfile(vocabname))
-        vectors = Vectors.loadf(coll.extractfile(vecname), config.format)
+        vocab = Vocabulary.loadf(coll.extractfile(vocabname), 
+                                 max_rank=max_rank)
+        vectors = Vectors.loadf(coll.extractfile(vecname), config.format,
+                                max_rank=max_rank)
         return cls(config, vocab, vectors)
 
     @staticmethod
@@ -561,11 +567,15 @@ class Vectors(object):
         return cls(rows)
 
     @classmethod
-    def load_tsv(cls, f):
-        """Return Vectors from file-like object f in TSV."""
+    def load_tsv(cls, f, max_rank=None):
+        """Return Vectors from file-like object f in TSV.
+
+        If max_rank is not None, only load max_rank first vectors."""
 
         rows = []
         for i, l in enumerate(f):
+            if max_rank is not None and i >= max_rank:
+                break
             #row = [float(i) for i in l.rstrip('\n').split()]
             row = numpy.fromstring(l, sep='\t')
             rows.append(row)
@@ -574,38 +584,44 @@ class Vectors(object):
         return cls.from_rows(rows)
 
     @classmethod
-    def load_numpy(cls, f):
-        """Return Vectors from file-like object f in NumPy format."""
+    def load_numpy(cls, f, max_rank=None):
+        """Return Vectors from file-like object f in NumPy format.
 
+        If max_rank is not None, only load max_rank first vectors."""
+
+        if max_rank is not None:
+            logging.warning('max_rank filter not implemented for npy data')
         return cls(numpy.load(f))
 
     @classmethod
-    def loadf(cls, f, format):
-        """Return Vectors from file-like object f in format."""
+    def loadf(cls, f, format, max_rank=None):
+        """Return Vectors from file-like object f in format.
+
+        If max_rank is not None, only load max_rank first vectors."""
 
         if format == TSV_FORMAT:
-            return cls.load_tsv(f)
+            return cls.load_tsv(f, max_rank=max_rank)
         elif format == NUMPY_FORMAT:
-            return cls.load_numpy(f)
+            return cls.load_numpy(f, max_rank=max_rank)
         else:
             raise NotImplementedError(format)
 
     @classmethod
-    def load(cls, name, format=None, encoding=DEFAULT_ENCODING):
+    def load(cls, name, format=None, encoding=DEFAULT_ENCODING, max_rank=None):
         """Return Vectors from pathname name in format.
 
         If format is None, determine format from filename extension.
-        """
+        If max_rank is not None, only load max_rank first vectors."""
 
         if format is None:
             format = os.path.splitext(name)[1].replace('.', '')
 
         if Vectors.is_text_format(format):
             with codecs.open(name, 'rt', encoding=encoding) as f:
-                return cls.loadf(f, format)
+                return cls.loadf(f, format, max_rank=max_rank)
         else:
             with codecs.open(name, 'rb') as f:
-                return cls.loadf(f, format)
+                return cls.loadf(f, format, max_rank=max_rank)
 
     @staticmethod
     def is_text_format(format):
@@ -682,11 +698,15 @@ class Vocabulary(object):
         return cls(rows)
 
     @classmethod
-    def loadf(cls, f):
-        """Return Vocabulary from file-like object f in TSV format."""
+    def loadf(cls, f, max_rank=None):
+        """Return Vocabulary from file-like object f in TSV format.
+
+        If max_rank is not None, only load max_rank most frequent words."""
 
         rows = []
-        for l in f:
+        for i, l in enumerate(f):
+            if max_rank is not None and i >= max_rank:
+                break
             l = l.rstrip()
             row = l.split('\t')
             if len(row) != 2:
@@ -700,11 +720,13 @@ class Vocabulary(object):
         return cls.from_rows(rows)
 
     @classmethod
-    def load(cls, name, encoding=DEFAULT_ENCODING):
-        """Return Vocabulary from pathname name in TSV format."""
+    def load(cls, name, encoding=DEFAULT_ENCODING, max_rank=None):
+        """Return Vocabulary from pathname name in TSV format.
+
+        If max_rank is not None, only load max_rank most frequent words."""
 
         with codecs.open(name, 'rU', encoding=encoding) as f:
-            return cls.loadf(f)
+            return cls.loadf(f, max_rank=max_rank)
 
 class ConfigError(Exception):
     pass
