@@ -943,7 +943,7 @@ def load(name, format=None, max_rank=None):
 
     if format == WVLIB_FORMAT:
         load_func = WVData.load
-    if format == WORD2VEC_FORMAT: # binary vs. text unspecified
+    elif format == WORD2VEC_FORMAT: # binary vs. text unspecified
         load_func = Word2VecData.load
     elif format == WORD2VEC_TEXT:
         load_func = Word2VecData.load_text
