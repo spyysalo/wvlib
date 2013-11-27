@@ -143,6 +143,7 @@ def main(argv=None):
     except Exception, e:
         if str(e):
             print >> sys.stderr, 'Error: %s' % str(e)
+            return 1
         else:
             raise
     return query_loop(wv, options)
