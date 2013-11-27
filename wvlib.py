@@ -253,6 +253,12 @@ class WVData(object):
         self._normalized = True
         return self
 
+    def filter_by_rank(self, r):
+        """Discard vectors for words other than the r most frequent."""
+        
+        self._invalidate()
+        self.vectors.shrink(r)
+
     def save(self, name, format=None, vector_format=None):
         """Save in format to pathname name.
 
@@ -342,17 +348,23 @@ class WVData(object):
         return izip(self.vocab.iterwords(), iter(self.vectors))
 
     @classmethod
-    def load(cls, name):
-        """Return WVData from pathname name."""
+    def load(cls, name, max_rank=None):
+        """Return WVData from pathname name.
+
+        If max_rank is not None, only load max_rank most frequent words.
+        """
 
         format = cls.guess_format(name)
         if format == cls.TAR:
-            return cls.load_tar(name)
+            wv = cls.load_tar(name)
         elif format == cls.DIR:
-            return cls.load_dir(name)
+            wv = cls.load_dir(name)
         else:
             raise NotImplementedError
-
+        if max_rank is not None:
+            wv.filter_by_rank(max_rank)
+        return wv
+            
     @classmethod
     def load_tar(cls, name):
         """Return WVData from tar or tar.gz name."""
@@ -485,6 +497,11 @@ class Vectors(object):
             self.vectors[i] = v/numpy.linalg.norm(v)
         self._normalized = True
         return self
+
+    def shrink(self, s):
+        """Discard vectors other than the first s."""
+
+        self.vectors = self.vectors[:s]
 
     def to_rows(self):
         return self.vectors
@@ -766,35 +783,48 @@ class Word2VecData(WVData):
         return cls(cls.read(f, cls.read_binary_line))
 
     @classmethod
-    def load_binary(cls, name):
+    def load_binary(cls, name, max_rank=None):
         """Return Word2VecData from pathname name in the word2vec
-        binary format."""
+        binary format.
+
+        If max_rank is not None, only load max_rank most frequent words.
+        """
 
         with open(name, 'rb') as f:
-            return cls.load_binaryf(f)
+            wv = cls.load_binaryf(f)
+        if max_rank is not None:
+            wv.filter_by_rank(max_rank)
+        return wv
 
     @classmethod
-    def load_text(cls, name, encoding=DEFAULT_ENCODING):
+    def load_text(cls, name, encoding=DEFAULT_ENCODING, max_rank=None):
         """Return Word2VecData from pathname name in the word2vec text
-        format."""
+        format.
+
+        If max_rank is not None, only load max_rank most frequent words.
+        """
 
         with codecs.open(name, 'rU', encoding=encoding) as f:
-            return cls.load_textf(f)
+            wv = cls.load_textf(f)
+        if max_rank is not None:
+            wv.filter_by_rank(max_rank)
+        return wv
     
     @classmethod
-    def load(cls, name, binary=None, encoding=DEFAULT_ENCODING):
+    def load(cls, name, binary=None, encoding=DEFAULT_ENCODING, max_rank=None):
         """Return Word2VecData from pathname name in the word2vec
         binary or text format.
 
         If binary is None, determine format heuristically.
+        If max_rank is not None, only load max_rank most frequent words.
         """
 
         if binary is None:
             binary = not cls.is_w2v_text(name, encoding)
         if binary:
-            return cls.load_binary(name)
+            return cls.load_binary(name, max_rank=max_rank)
         else:
-            return cls.load_text(name, encoding)
+            return cls.load_text(name, encoding, max_rank=max_rank)
 
     @staticmethod
     def read_size_line(f):
@@ -895,10 +925,11 @@ def _guess_format(name):
         return WVLIB_FORMAT
     return None
 
-def load(name, format=None):
+def load(name, format=None, max_rank=None):
     """Load word vectors from pathname name in format.
 
     If format is None, determine format heuristically.
+    If max_rank is not None, only load max_rank most frequent words.
     """
 
     if not os.path.exists(name):
@@ -911,15 +942,16 @@ def load(name, format=None):
     logging.info('loading %s as %s' % (name, format))
 
     if format == WVLIB_FORMAT:
-        return WVData.load(name)
+        load_func = WVData.load
     if format == WORD2VEC_FORMAT: # binary vs. text unspecified
-        return Word2VecData.load(name)
+        load_func = Word2VecData.load
     elif format == WORD2VEC_TEXT:
-        return Word2VecData.load_text(name)
+        load_func = Word2VecData.load_text
     elif format == WORD2VEC_BIN:
-        return Word2VecData.load_binary(name)
+        load_func = Word2VecData.load_binary
     else:
         raise NotImplementedError        
+    return load_func(name, max_rank=max_rank)
 
 ### misc. helper functions
 
