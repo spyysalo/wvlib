@@ -34,13 +34,13 @@ def process_query(wv, query, options=None):
     nearest = [[(n[0], n[1], wv[n[0]]) for n in l] for l in nearest]
     assert len(nearest) == 2, 'internal error'
     pairs = [(n1, n2, 
-              numpy.dot(wvlib.unit_vector(vectors[1]-vectors[0]+n2[2]), n1[2]))
+              numpy.dot(wvlib.unit_vector(vectors[1]-vectors[0]+n1[2]), n2[2]))
              for n1 in nearest[0] for n2 in nearest[1] if n1[0] != n2[0]]
     pairs.sort(lambda a, b: cmp(b[2], a[2]))
 
     nncount = options.number if options else 10
     for p in pairs[:nncount]:
-        print '%s\t---\t%s\t%f' % (p[1][0], p[0][0], p[2])
+        print '%s\t---\t%s\t%f' % (p[0][0], p[1][0], p[2])
 
     return True
 
