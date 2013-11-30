@@ -244,7 +244,8 @@ class WVData(object):
         return wordsim[:n]
 
     def approximate_nearest(self, v, n=10, exclude=None, 
-                            evalnum=1000, bits=None):
+                            evalnum=1000, bits=None,
+                            search_hash_neighborhood=True):
         """Return approximate nearest n words and similarities for
         given word or vector, excluding given words.
 
@@ -255,6 +256,11 @@ class WVData(object):
         LSH is initialized on the first invocation, which may take
         long for large numbers of word vectors. For a small number of
         NN queries, nearest() may be more efficient.
+
+        If search_hash_neighborhood is True, find approximate neigbors
+        by searching the Hamming neighborhood. This is more efficient
+        for hashes with comparatively high load factors (~1) but
+        inefficient for ones with low load factors.
 
         If v is a string, look up the corresponding word vector.
         If exclude is None and v is a string, exclude v.
@@ -268,10 +274,20 @@ class WVData(object):
         if isinstance(v, StringTypes):
             v, w = self.word_to_unit_vector(v), v
         else:
-            v, w = v/numpy.linalg.norm(v), None
+            v, w = v/numpy.linalg.norm(v), v
 
-        candidates = islice(self._lsh.neighbors(v), evalnum)
-        return self.nearest(v, n, exclude, candidates)
+        if search_hash_neighborhood:
+            candidates = islice(self._lsh.neighbors(v), evalnum)
+            return self.nearest(w, n, exclude, candidates)
+        else:
+            # evalnum nearest by hash similarity
+            sim = partial(self._lsh.item_similarity, h=self._lsh.hash(v), 
+                          bits=self._lsh.bits)
+            anearest = heapq.nlargest(evalnum, self._lsh.iteritems(), sim)
+            # nearest vectors for up to evalnum of nearest hashes
+            candidates = islice((wv for _, wvs in anearest for wv in wvs), 
+                                evalnum)
+            return self.nearest(w, n, exclude, candidates)
 
     def _initialize_lsh(self, bits):
         if bits is None:
@@ -1053,9 +1069,7 @@ class RandomHyperplaneLSH(object):
             v1 = self.hash(v1)
         if not isinstance(v2, (int, long)):
             v2 = self.hash(v2)
-        # 1 - (Hamming distance/max Hamming distance) for hashes.
-        # set bit count per http://stackoverflow.com/a/9831671
-        return 1 - bin(v1^v2).count('1')/float(self.bits)
+        return self.hash_similarity(v1, v2, self.bits)
 
     def neighbors(self, h, min_dist=0, number=None):
         """Yield neighbors of given hash or vector ordered by
@@ -1085,6 +1099,9 @@ class RandomHyperplaneLSH(object):
     def load_factor(self):
         return float(self._entries)/2**self.bits
 
+    def iteritems(self, max_items=None):
+        return self._values.iteritems()
+
     def add(self, key, value):
         if not isinstance(key, (int, long)):
             key = self.hash(key)
@@ -1097,6 +1114,10 @@ class RandomHyperplaneLSH(object):
         if not isinstance(key, (int, long)):
             key = self.hash(key)
         return self._values.get(key, [])
+
+    @staticmethod
+    def item_similarity(i, h, bits):
+        return hash_similarity(i[0], h, bits)
 
 def _guess_format(name):
     for ext, format in extension_format_map.items():
@@ -1164,6 +1185,11 @@ def hamming_neighbors(i, bits, distance):
         while mask < 1 << bits:
             yield i ^ mask
             mask = lex_next_bits(mask)
+
+def hash_similarity(h1, h2, bits):
+    # 1 - (Hamming distance/max Hamming distance).
+    # set bit count per http://stackoverflow.com/a/9831671
+    return 1 - bin(h1^h2).count('1')/float(bits)
     
 def unit_vector(v):
     return v/numpy.linalg.norm(v)
