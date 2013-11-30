@@ -67,6 +67,7 @@ Load word vectors and save with vectors in TSV format:
 import sys
 import os
 
+import math
 import json
 import codecs
 import tarfile
@@ -80,6 +81,7 @@ from itertools import tee, izip, islice
 from StringIO import StringIO
 from types import StringTypes
 from time import time
+from collections import defaultdict
 
 try:
     from collections import OrderedDict
@@ -133,6 +135,7 @@ class WVData(object):
         self.vectors = vectors
         self._w2v_map = None
         self._normalized = False
+        self._lsh = None
 
     def words(self):
         """Return list of words in the vocabulary."""
@@ -213,17 +216,17 @@ class WVData(object):
             v1, v2 = v1/numpy.linalg.norm(v1), v2/numpy.linalg.norm(v2)
         return numpy.dot(v1, v2)
 
-    def nearest(self, v, n=10, exclude=None):
+    def nearest(self, v, n=10, exclude=None, candidates=None):
         """Return nearest n words and similarities for given word or vector,
         excluding given words.
 
-        If exclude is None and v is a string, exclude v.
         If v is a string, look up the corresponding word vector.
+        If exclude is None and v is a string, exclude v.
+        If candidates is not None, only consider (word, vector)
+        values from iterable candidates.
         Return value is a list of (word, similarity) pairs.
         """
 
-        if exclude is None:
-            exclude = []
         if isinstance(v, StringTypes):
             v, w = self.word_to_unit_vector(v), v
         else:
@@ -234,10 +237,57 @@ class WVData(object):
             sim = partial(self._item_similarity, v=v)
         else:
             sim = partial(self._item_similarity_normalized, v=v)
-        w2v = self.word_to_vector_mapping()
-        nearest = heapq.nlargest(n+len(exclude), w2v.iteritems(), sim)
+        if candidates is None:
+            candidates = self.word_to_vector_mapping().iteritems()
+        nearest = heapq.nlargest(n+len(exclude), candidates, sim)
         wordsim = [(p[0], sim(p)) for p in nearest if p[0] not in exclude]
         return wordsim[:n]
+
+    def approximate_nearest(self, v, n=10, exclude=None, 
+                            evalnum=1000, bits=None):
+        """Return approximate nearest n words and similarities for
+        given word or vector, excluding given words.
+
+        Uses random hyperplane-based locality sensitive hashing (LSH)
+        with given number of bits, evaluating evalnum approximate
+        neighbors exactly.
+
+        LSH is initialized on the first invocation, which may take
+        long for large numbers of word vectors. For a small number of
+        NN queries, nearest() may be more efficient.
+
+        If v is a string, look up the corresponding word vector.
+        If exclude is None and v is a string, exclude v.
+        If bits is None, estimate number of bits to use.
+        Return value is a list of (word, similarity) pairs.
+        """
+
+        if self._lsh is None or (bits is not None and bits != self._lsh.bits):
+            self._initialize_lsh(bits)
+
+        if isinstance(v, StringTypes):
+            v, w = self.word_to_unit_vector(v), v
+        else:
+            v, w = v/numpy.linalg.norm(v), None
+
+        candidates = islice(self._lsh.neighbors(v), evalnum)
+        return self.nearest(v, n, exclude, candidates)
+
+    def _initialize_lsh(self, bits):
+        if bits is None:
+            w = self.config.word_count
+            bits = max(4, int(math.ceil(math.log(w, 2))))
+            logging.debug('init lsh: %d vectors, %d bits' % (w, bits))
+
+        self._lsh = RandomHyperplaneLSH(self.config.vector_dim, bits)
+        for w, v in self:
+            self._lsh.add(v, (w, v))
+
+        lf = self._lsh.load_factor()
+        logging.debug('init lsh: load factor %.2f' % lf)
+        if lf < 0.1:
+            logging.warning('low lsh load factor (%f), neighbors searches '
+                            'may be slow' % lf)
 
     def normalize(self):
         """Normalize word vectors.
@@ -329,6 +379,7 @@ class WVData(object):
         """Invalidate cached values."""
 
         self._w2v_map = None
+        self._lsh = None
 
     def __getitem__(self, word):
         """Return vector for given word."""
@@ -964,6 +1015,89 @@ class Word2VecData(WVData):
         with codecs.open(name, 'rU', encoding=encoding) as f:
             return Word2VecData.is_w2v_textf(f)
 
+class RandomHyperplaneLSH(object):
+    """Random hyperplane-based locality sensitive hash following
+    Charikar (2002)."""
+
+    def __init__(self, dim, bits):
+        """Initialize for dim-dimensional vectors hashed to bits-bit
+        signatures."""
+        
+        self.dim = dim
+        self.bits = bits
+        self.vectors = numpy.random.randn(bits, dim)
+        # note: normalization not strictly required
+        self.vectors = [v/numpy.linalg.norm(v) for v in self.vectors]
+        self._values = {}
+        self._entries = 0
+
+    def hash(self, v):
+        """Return hash for given vector."""
+
+        # note: normalization not strictly required
+        v = v/numpy.linalg.norm(v)
+        h = 0
+        for u in self.vectors:
+            h <<= 1
+            if numpy.dot(u, v) > 0:
+                h |= 1
+        return h
+
+    def similarity(self, v1, v2):
+        """Return approximate cosine similarity of given vectors or
+        hashes.
+
+        If v1/v2 is a vector, hash before calculating similarity."""
+
+        if not isinstance(v1, (int, long)):
+            v1 = self.hash(v1)
+        if not isinstance(v2, (int, long)):
+            v2 = self.hash(v2)
+        # 1 - (Hamming distance/max Hamming distance) for hashes.
+        # set bit count per http://stackoverflow.com/a/9831671
+        return 1 - bin(v1^v2).count('1')/float(self.bits)
+
+    def neighbors(self, h, min_dist=0, number=None):
+        """Yield neighbors of given hash or vector ordered by
+        increasing Hamming distance.
+
+        If h is a vector, hash before finding neighbors.
+        If number is not None, yield at most given number of neighbors.
+
+        Note: is the load factor is low, this function may be very slow.
+        """
+
+        # TODO: revert to linear search on low load factor
+
+        if min_dist < 0:
+            raise ValueError('min_dist must be >= 0')
+        if not isinstance(h, (int, long)):
+            h = self.hash(h)        
+        i = 0
+        for distance in range(min_dist, self.bits):
+            for n in hamming_neighbors(h, self.bits, distance):
+                for v in self[n]:
+                    if number is not None and i >= number:
+                        raise StopIteration
+                    yield v
+                    i += 1        
+
+    def load_factor(self):
+        return float(self._entries)/2**self.bits
+
+    def add(self, key, value):
+        if not isinstance(key, (int, long)):
+            key = self.hash(key)
+        if key not in self._values:
+            self._values[key] = []
+        self._values[key].append(value)
+        self._entries += 1
+
+    def __getitem__(self, key):
+        if not isinstance(key, (int, long)):
+            key = self.hash(key)
+        return self._values.get(key, [])
+
 def _guess_format(name):
     for ext, format in extension_format_map.items():
         if name.endswith(ext):
@@ -1008,6 +1142,28 @@ def pairwise(iterable):
     a, b = tee(iterable)
     next(b, None)
     return izip(a, b)
+
+# transated from http://www.hackersdelight.org/hdcodetxt/snoob.c.txt
+def lex_next_bits(i):
+    """Return next number with same number of set bits as i."""
+    
+                                 # i = xxx0 1111 0000
+    smallest = i & -i;           #     0000 0001 0000
+    ripple = i + smallest;       #     xxx1 0000 0000
+    ones = i ^ ripple;           #     0001 1111 0000
+    ones = (ones >> 2)/smallest; #     0000 0000 0111
+    return ripple | ones;        #     xxx1 0000 0111
+
+def hamming_neighbors(i, bits, distance):
+    """Yield numbers with given Hamming distance to i."""
+
+    if distance == 0:
+        yield i
+    else:
+        mask = int(distance * '1', 2)
+        while mask < 1 << bits:
+            yield i ^ mask
+            mask = lex_next_bits(mask)
     
 def unit_vector(v):
     return v/numpy.linalg.norm(v)
