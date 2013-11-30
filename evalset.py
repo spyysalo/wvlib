@@ -32,6 +32,8 @@ def argparser():
         import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
+    ap.add_argument('-a', '--approximate', default=False, action='store_true',
+                    help='evaluate using approximate neighbors')
     ap.add_argument('-l', '--list', default=False, action='store_true',
                     help='FILE is nearest-neighbor list')
     ap.add_argument('-n', '--word-number', default=1, metavar='INT', type=int,
@@ -277,14 +279,18 @@ def query_vector(wv, words):
     else:
         return wvlib.unit_vector(sum(vectors))
 
-def get_nearest(vectors, queries, nncount=100):
+def get_nearest(vectors, queries, nncount=100, options=None):
     nearest = {}
     wv = wvlib.load(vectors).normalize()
     for query in queries:
         words = query.split()
         v = query_vector(wv, words)
         if v is not None:
-            word_sim = wv.nearest(v, n=nncount, exclude=words)
+            if options is None or not options.approximate:
+                word_sim = wv.nearest(v, n=nncount, exclude=words)
+            else:
+                word_sim = wv.approximate_nearest(v, n=nncount, exclude=words,
+                                                  evalnum=10*nncount)
             nearest[query] = [ws[0] for ws in word_sim]
         else:
             nearest[query] = [] # out of vocabulary
@@ -302,7 +308,7 @@ def evaluate_sets(infn, word_sets, options):
     if options.list:
         nearest = read_nearest_lists(infn)
     else:
-        nearest = get_nearest(infn, queries, nncount)
+        nearest = get_nearest(infn, queries, nncount, options)
 
     results = []
     for queries, targets, accept, name in query_sets:
