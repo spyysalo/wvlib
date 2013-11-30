@@ -231,8 +231,8 @@ class WVData(object):
             v, w = self.word_to_unit_vector(v), v
         else:
             v, w = v/numpy.linalg.norm(v), None
-        if exclude is None and w is not None:
-            exclude = set([w])
+        if exclude is None:
+            exclude = [] if w is None else set([w])
         if not self._normalized:
             sim = partial(self._item_similarity, v=v)
         else:
