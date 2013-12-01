@@ -342,3 +342,8 @@ def main(argv=None):
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
+
+    # runs main() with profiling. To see a profile, run e.g.
+    # python -c 'import pstats; pstats.Stats("profile").strip_dirs().sort_stats("time").print_stats()' | less
+#    import cProfile
+#    cProfile.run('main(sys.argv)', 'profile')

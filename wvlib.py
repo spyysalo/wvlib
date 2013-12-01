@@ -1056,8 +1056,6 @@ class RandomHyperplaneLSH(object):
     def hash(self, v):
         """Return hash for given vector."""
 
-        # note: normalization not strictly required
-        v = v/numpy.linalg.norm(v)
         h = 0
         for u in self.vectors:
             h <<= 1
