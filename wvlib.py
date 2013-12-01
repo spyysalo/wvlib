@@ -132,7 +132,7 @@ class WVData(object):
         # TODO: check config-vocab-vectors consistency
         self.config = config
         self.vocab = vocab
-        self.vectors = vectors
+        self._vectors = vectors
         self._w2v_map = None
         self._normalized = False
         self._lsh = None
@@ -141,6 +141,11 @@ class WVData(object):
         """Return list of words in the vocabulary."""
 
         return self.vocab.words()
+
+    def vectors(self):
+        """Return vectors as numpy array."""
+
+        return self._vectors.vectors
 
     def rank(self, w):
         """Return rank (ordinal, 0-based) of word w in the vocabulary."""
@@ -315,7 +320,7 @@ class WVData(object):
         if self._normalized:
             return
         self._invalidate()
-        self.vectors.normalize()
+        self._vectors.normalize()
         self._normalized = True
         return self
 
@@ -326,8 +331,9 @@ class WVData(object):
             self._invalidate()
             self.config.word_count = r
             self.vocab.shrink(r)
-            self.vectors.shrink(r)
-
+            self._vectors.shrink(r)
+        return self
+            
     def save(self, name, format=None, vector_format=None):
         """Save in format to pathname name.
 
@@ -377,7 +383,7 @@ class WVData(object):
             vecfile_name = VECTOR_BASE + '.' + vecformat
             self._save_in_tar(f, CONFIG_NAME, self.config.savef)
             self._save_in_tar(f, VOCAB_NAME, self.vocab.savef)            
-            self._save_in_tar(f, vecfile_name, partial(self.vectors.savef,
+            self._save_in_tar(f, vecfile_name, partial(self._vectors.savef,
                                                        format = vecformat))
         finally:
             f.close()
@@ -389,7 +395,7 @@ class WVData(object):
         vecfile_name = VECTOR_BASE + '.' + vecformat
         self.config.save(os.path.join(name, CONFIG_NAME))
         self.vocab.save(os.path.join(name, VOCAB_NAME))
-        self.vectors.save(os.path.join(name, vecfile_name, vecformat))
+        self._vectors.save(os.path.join(name, vecfile_name, vecformat))
 
     def _invalidate(self):
         """Invalidate cached values."""
@@ -414,8 +420,8 @@ class WVData(object):
     def __iter__(self):
         """Iterate over (word, vector) pairs."""
 
-        #return izip(self.vocab.words(), self.vectors)
-        return izip(self.vocab.iterwords(), iter(self.vectors))
+        #return izip(self.vocab.words(), self._vectors)
+        return izip(self.vocab.iterwords(), iter(self._vectors))
 
     @classmethod
     def load(cls, name, max_rank=None):
