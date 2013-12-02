@@ -7,6 +7,14 @@ import logging
 import scipy.cluster
 import wvlib
 
+try:
+    import sklearn.cluster
+    logging.info('using scikit-learn')
+    with_sklearn = True
+except ImportError:
+    logging.warning('failed to import scikit-learn, falling back on scipy')
+    with_sklearn = False
+
 from itertools import izip
 
 KMEANS = 'kmeans'
@@ -62,9 +70,14 @@ def process_options(args):
     return words, vectors, options
 
 def kmeans(vectors, k):
-    codebook, distortion = scipy.cluster.vq.kmeans(vectors, k)
-    cluster_ids, dist = scipy.cluster.vq.vq(vectors, codebook)
-    return cluster_ids
+    if with_sklearn:
+        kmeans = sklearn.cluster.KMeans(k)
+        kmeans.fit(vectors)
+        return kmeans.labels_
+    else:
+        codebook, distortion = scipy.cluster.vq.kmeans(vectors, k)
+        cluster_ids, dist = scipy.cluster.vq.vq(vectors, codebook)
+        return cluster_ids
 
 def write_strict_clusters(words, cluster_ids, out=None):
     """Write given list of words and their corresponding cluster ids to out."""
