@@ -71,7 +71,8 @@ def process_options(args):
 
 def kmeans(vectors, k):
     if with_sklearn:
-        kmeans = sklearn.cluster.KMeans(k)
+        #kmeans = sklearn.cluster.KMeans(k)
+        kmeans = sklearn.cluster.MiniBatchKMeans(k)
         kmeans.fit(vectors)
         return kmeans.labels_
     else:
