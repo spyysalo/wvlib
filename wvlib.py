@@ -74,6 +74,7 @@ import tarfile
 import logging
 
 import numpy
+import scipy.sparse
 import heapq
 
 from functools import partial
@@ -103,6 +104,7 @@ WORD2VEC_FORMAT = 'w2v'
 WORD2VEC_TEXT = 'w2vtxt'
 WORD2VEC_BIN = 'w2vbin'
 WVLIB_FORMAT = 'wvlib'
+CID_FORMAT = 'cid'
 
 extension_format_map = {
     '.txt' : WORD2VEC_TEXT,
@@ -111,6 +113,7 @@ extension_format_map = {
     '.tgz' : WVLIB_FORMAT,
     '.tar.gz' : WVLIB_FORMAT,
     '.tar.bz2' : WVLIB_FORMAT,
+    '.classes' : CID_FORMAT,
 }
 
 # supported vector formats and filename extensions
@@ -395,7 +398,7 @@ class WVData(object):
         vecfile_name = VECTOR_BASE + '.' + vecformat
         self.config.save(os.path.join(name, CONFIG_NAME))
         self.vocab.save(os.path.join(name, VOCAB_NAME))
-        self._vectors.save(os.path.join(name, vecfile_name, vecformat))
+        self._vectors.save(os.path.join(name, vecfile_name))
 
     def _invalidate(self):
         """Invalidate cached values."""
@@ -619,7 +622,7 @@ class Vectors(object):
 
         logging.debug('save vectors in %s to %s' % (format, name))
 
-        if format in Vectors._text_format:
+        if Vectors.is_text_format(format):
             with codecs.open(name, 'wt', encoding=encoding) as f:
                 return self.savef(f, format)
         else:
@@ -875,6 +878,60 @@ class Config(object):
         return cls(WV_FORMAT_VERSION, word_count, vector_dim, 
                    Vectors.default_format)
 
+class OneHotWVData(WVData):
+
+    def __init__(self, word_idx):
+        maxi = max([i for _, i in word_idx])
+        config = Config.default(len(word_idx), maxi+1)
+        logging.warning('word2vec load: filling in 0s for word counts')
+        vocab = Vocabulary([(w, 0) for w, _ in word_idx])
+        logging.warning('XXX DELME %d %d' % (len(word_idx), maxi))
+        # segfaults on todense() for very large matrices:
+        # https://github.com/scipy/scipy/issues/2179
+#         row = numpy.array(range(len(word_idx)))
+#         col = numpy.array([i for _, i in word_idx])
+#         val = numpy.ones(len(word_idx))
+#         m = scipy.sparse.coo_matrix((val,(row,col)))
+#         nv = numpy.array(m.todense())
+        nv = []
+        for _, i in word_idx:
+            nv.append(numpy.zeros(maxi+1))
+            nv[-1][i] = 1
+        vectors = Vectors(nv)
+        super(OneHotWVData, self).__init__(config, vocab, vectors)
+    
+    @classmethod
+    def loadf(cls, f, max_rank=None):
+        """Return OneHotWVData from file-like object f in 
+        word<TAB>cluster-id format.
+
+        If max_rank is not None, only load max_rank most frequent words.
+        """
+        
+        data = []
+        sep = '\t'
+        for i, l in islice(enumerate(f), max_rank):
+            l = l.rstrip('\n')
+            try:
+                word, cid = l.split(sep)
+            except ValueError:
+                logging.warning('failed to load as TSV, fall back to space')
+                sep = None
+                word, cid = l.split(sep)
+            data.append((word, int(cid)))
+        return cls(data)
+
+    @classmethod
+    def load(cls, name, encoding=DEFAULT_ENCODING, max_rank=None):
+        """Return OneHotWVData from pathname name in 
+        word<TAB>cluster-id format.
+
+        If max_rank is not None, only load max_rank most frequent words.
+        """
+        
+        with codecs.open(name, 'rt', encoding=encoding) as f:
+            return cls.loadf(f, max_rank=max_rank)
+        
 class Word2VecData(WVData):
 
     def __init__(self, data):
@@ -1155,6 +1212,8 @@ def load(name, format=None, max_rank=None):
         load_func = Word2VecData.load_text
     elif format == WORD2VEC_BIN:
         load_func = Word2VecData.load_binary
+    elif format == CID_FORMAT:
+        load_func = OneHotWVData.load
     else:
         raise NotImplementedError        
     return load_func(name, max_rank=max_rank)
