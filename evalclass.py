@@ -75,26 +75,35 @@ def enough_data(wordsets):
     else:
         return True
 
-FIRST, SECOND = range(2)
+FIRST, SECOND, UNDEF = range(3)
 def closer(w1, w2, w, w2v):
     d1 = numpy.dot(w2v[w1], w2v[w])
     d2 = numpy.dot(w2v[w2], w2v[w])
     if d1 > d2:
         return FIRST
-    else:
+    elif d1 < d2:
         return SECOND
+    else:
+        return UNDEF
+
+def score(w1, w2, w, w2v, answer):
+    pred = closer(w1, w2, w, w2v)
+    if pred == answer:
+        return 1.0
+    elif pred == UNDEF:
+        return 0.5
+    else:
+        return 0.0
 
 def compare_sets(set1, name1, set2, name2, w2v, options=None):
     total, correct = 0, 0
     for w1 in set1:
         for w2 in set2:
             for w in (x for x in set1 if x != w1):
-                if closer(w1, w2, w, w2v) == FIRST:
-                    correct += 1
+                correct += score(w1, w2, w, w2v, FIRST)
                 total += 1
             for w in (x for x in set2 if x != w2):
-                if closer(w1, w2, w, w2v) == SECOND:
-                    correct += 1
+                correct += score(w1, w2, w, w2v, SECOND)
                 total += 1
     if not total:
         print >> sys.stderr, '%s - %s: No comparisons succeeded!' % \
