@@ -1,6 +1,8 @@
 wvlib - word vector library
 ===========================
 
+Work in progress, not currently recommended for any use.
+
 Try the following:
 
 Find 10 words closest to "protein" using word2vec vectors induced on
