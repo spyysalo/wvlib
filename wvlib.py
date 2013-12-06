@@ -62,6 +62,16 @@ Load word vectors and save with vectors in TSV format:
 >>> import wvlib
 >>> wv = wvlib.load("text8.tar.gz")
 >>> wv.save("text8-tsv.tar.gz", vector_format="tsv")
+
+Load word vectors, normalize, find nearest for each of a set of words
+using locality sensitive hashing (LSH)-based approximate nearest
+neighbors.
+
+>>> import wvlib
+>>> wv = wvlib.load("text8.tar.gz").normalize()
+>>> for w in ["snowfall", "titanium", "craftsman", "apple", "anger",
+...           "leukemia", "yuan", "club", "cylinder", "mandarin", "boat"]:
+...     print w, wv.approximate_nearest(w)[0]
 """
 
 import sys
