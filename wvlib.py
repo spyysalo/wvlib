@@ -895,7 +895,6 @@ class OneHotWVData(WVData):
         config = Config.default(len(word_idx), maxi+1)
         logging.warning('word2vec load: filling in 0s for word counts')
         vocab = Vocabulary([(w, 0) for w, _ in word_idx])
-        logging.warning('XXX DELME %d %d' % (len(word_idx), maxi))
         # segfaults on todense() for very large matrices:
         # https://github.com/scipy/scipy/issues/2179
 #         row = numpy.array(range(len(word_idx)))
