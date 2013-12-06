@@ -919,14 +919,21 @@ class OneHotWVData(WVData):
         
         data = []
         sep = '\t'
+        toint = int
         for i, l in islice(enumerate(f), max_rank):
             l = l.rstrip('\n')
             try:
                 word, cid = l.split(sep)
             except ValueError:
-                logging.warning('failed to load as TSV, fall back to space')
+                logging.warning('failed to load as TSV, trying space')
                 sep = None
                 word, cid = l.split(sep)
+            try:
+                cid = toint(cid)
+            except ValueError:
+                logging.warning('failed to load as base 10, trying binary')
+                toint = partial(int, base=2)
+                cid = toint(cid)
             data.append((word, int(cid)))
         return cls(data)
 
