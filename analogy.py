@@ -14,7 +14,7 @@ import os
 
 import wvlib
 
-from distance import process_options, get_query, output_nearest
+from nearest import process_options, get_query, output_nearest
 
 def process_query(wv, query, options=None):
     try:        

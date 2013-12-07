@@ -15,7 +15,7 @@ import numpy
 
 import wvlib
 
-from distance import process_options, get_query
+from nearest import process_options, get_query
 
 def process_query(wv, query, options=None):
     try:        
