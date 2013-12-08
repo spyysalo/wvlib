@@ -21,6 +21,7 @@ import logging
 import numpy
 import wvlib
 
+from scipy.cluster.vq import whiten
 from itertools import combinations, izip
 from scipy.spatial import distance
 # TODO: consider sklearn.neighbors.DistanceMetric if available
@@ -84,7 +85,7 @@ def process_options(args):
 
     if options.whiten:
         logging.info('normalize features to unit variance')
-        vectors = scipy.cluster.vq.whiten(vectors)
+        vectors = whiten(vectors)
 
     return words, vectors, options
 
