@@ -331,7 +331,7 @@ class WVData(object):
         word_similarity()."""
 
         if self._normalized:
-            return
+            return self
         self._invalidate()
         self._vectors.normalize()
         self._normalized = True
@@ -587,7 +587,7 @@ class Vectors(object):
 
     def normalize(self):
         if self._normalized:
-            return
+            return self
         for i, v in enumerate(self.vectors):
             self.vectors[i] = v/numpy.linalg.norm(v)
         self._normalized = True
