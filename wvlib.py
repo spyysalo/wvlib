@@ -83,7 +83,9 @@ import codecs
 import tarfile
 import logging
 
+import traceback
 import numpy
+import numpy.numarray
 import scipy.sparse
 import heapq
 
@@ -93,6 +95,8 @@ from StringIO import StringIO
 from types import StringTypes
 from time import time
 from collections import defaultdict
+import struct
+import ast #for ast.literal_eval
 
 try:
     from collections import OrderedDict
@@ -680,11 +684,23 @@ class Vectors(object):
         # if max_rank is not None:
         #     return cls(numpy.array(numpy.load(f, mmap_mode='r')[:max_rank]))
 
-        v = cls(numpy.load(f))
-        if max_rank is not None:
-            # see comment above
-            logging.debug('note: full numpy.load() despite max_rank')
-            v.shrink(max_rank)
+        #We'll need to hack into the npy format to make this happen
+        # https://github.com/numpy/numpy/blob/master/doc/neps/npy-format.txt
+        if max_rank is not None: 
+            magic_string=f.read(6)
+            if magic_string!='\x93NUMPY':
+                raise ValueError('The input does not seem to be an NPY file (magic string does not match).')
+            major_ver,minor_ver,header_len=struct.unpack("<BBH",f.read(1+1+2))
+            #TODO: check format versions?
+            format_dict_str=f.read(header_len).strip() #Dictionary string repr. with the array format
+            format_dict=ast.literal_eval(format_dict_str) #this should be reasonably safe
+            rows,cols=format_dict['shape'] #Shape of the array as stored in the file
+            new_shape=(min(rows,max_rank),cols) #Clipped shape of the array
+            array=numpy.numarray.fromfile(f,format_dict['descr'],new_shape[0]*new_shape[1])
+            array=array.reshape(new_shape)
+            v=cls(array)
+        else:
+            v = cls(numpy.load(f))
         return v
 
     @classmethod
@@ -792,13 +808,14 @@ class Vocabulary(object):
         return cls(rows)
 
     @classmethod
-    def loadf(cls, f, max_rank=None):
+    def loadf(cls, f, max_rank=None, encoding=DEFAULT_ENCODING):
         """Return Vocabulary from file-like object f in TSV format.
 
         If max_rank is not None, only load max_rank most frequent words."""
 
         rows = []
         for i, l in enumerate(f):
+            l=unicode(l,encoding)
             if max_rank is not None and i >= max_rank:
                 break
             l = l.rstrip()
