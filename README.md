@@ -1,12 +1,14 @@
 wvlib - word vector library
 ===========================
 
+Work in progress, not currently recommended for any use.
+
 Try the following:
 
 Find 10 words closest to "protein" using word2vec vectors induced on
 the text8 demo data
 
-    echo protein | python distance.py text8.tar.gz -n 10
+    echo protein | python nearest.py text8.tar.gz -n 10
 
 Find word that has the same relationship to "japan" as "paris" has
 to "france"

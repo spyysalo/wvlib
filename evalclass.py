@@ -38,6 +38,7 @@ def argparser():
         import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
+    ap.add_argument('-q', '--quiet', default=False, action='store_true')
     ap.add_argument('vectors', nargs=1, help='word2vec word vectors')
     ap.add_argument('wordset', nargs='+', help='word sets', metavar='FILE')
     return ap
@@ -74,26 +75,35 @@ def enough_data(wordsets):
     else:
         return True
 
-FIRST, SECOND = range(2)
+FIRST, SECOND, UNDEF = range(3)
 def closer(w1, w2, w, w2v):
     d1 = numpy.dot(w2v[w1], w2v[w])
     d2 = numpy.dot(w2v[w2], w2v[w])
     if d1 > d2:
         return FIRST
-    else:
+    elif d1 < d2:
         return SECOND
+    else:
+        return UNDEF
 
-def compare_sets(set1, name1, set2, name2, w2v):
+def score(w1, w2, w, w2v, answer):
+    pred = closer(w1, w2, w, w2v)
+    if pred == answer:
+        return 1.0
+    elif pred == UNDEF:
+        return 0.5
+    else:
+        return 0.0
+
+def compare_sets(set1, name1, set2, name2, w2v, options=None):
     total, correct = 0, 0
     for w1 in set1:
         for w2 in set2:
             for w in (x for x in set1 if x != w1):
-                if closer(w1, w2, w, w2v) == FIRST:
-                    correct += 1
+                correct += score(w1, w2, w, w2v, FIRST)
                 total += 1
             for w in (x for x in set2 if x != w2):
-                if closer(w1, w2, w, w2v) == SECOND:
-                    correct += 1
+                correct += score(w1, w2, w, w2v, SECOND)
                 total += 1
     if not total:
         print >> sys.stderr, '%s - %s: No comparisons succeeded!' % \
@@ -101,8 +111,9 @@ def compare_sets(set1, name1, set2, name2, w2v):
         return None
     else:
         avg = 1.*correct/total
-        print 'AVERAGE %s - %s: %.2f%% (%d/%d)' % \
-            (name1, name2, 100*avg, correct, total)
+        if not options or not options.quiet:
+            print 'AVERAGE %s - %s: %.2f%% (%d/%d)' % \
+                (name1, name2, 100*avg, correct, total)
         return avg
         
 def main(argv=None):
@@ -110,6 +121,9 @@ def main(argv=None):
         argv = sys.argv
 
     options = argparser().parse_args(argv[1:])
+
+    if options.quiet:
+        logging.getLogger().setLevel(logging.ERROR)
 
     wordsets = read_wordsets(options.wordset)
 
@@ -141,16 +155,17 @@ def main(argv=None):
 
     results = []
     for n1, n2 in combinations(wordsets.keys(), 2):
-        result = compare_sets(wordsets[n1], n1, wordsets[n2], n2, w2v)
+        result = compare_sets(wordsets[n1], n1, wordsets[n2], n2, w2v, options)
         if result is not None:
             results.append(result)
 
-    print >> sys.stderr, 'out of vocabulary %d/%d (%.2f%%)' % \
-        (oov_count, word_count, 100.*oov_count/word_count)
+    if not options.quiet:
+        print >> sys.stderr, 'out of vocabulary %d/%d (%.2f%%)' % \
+            (oov_count, word_count, 100.*oov_count/word_count)
 
     if results:
-        print 'OVERALL AVERAGE (macro): %.2f%%' % \
-            (100*sum(results)/len(results))
+        print 'OVERALL AVERAGE (macro):\t%.2f%%\t(%.2f%% OOV)' % \
+            (100*sum(results)/len(results), 100.*oov_count/word_count)
     else:
         print >> sys.stderr, 'All comparisons failed!'
 

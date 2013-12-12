@@ -30,6 +30,8 @@ def argparser():
                     help='multiword input')
     ap.add_argument('-n', '--number', metavar='INT', default=40, type=int,
                     help='number of nearest words to retrieve')
+    ap.add_argument('-r', '--max-rank', metavar='INT', default=None, 
+                    type=int, help='only consider r most frequent words')
     ap.add_argument('-q', '--quiet', default=False, action='store_true',
                     help='minimal output')
     ap.add_argument('-x', '--exit-word', default='EXIT',
@@ -45,7 +47,10 @@ def process_options(args, prompt='Enter words'):
     else:
         options.prompt = prompt + ' (%s or CTRL-D to break):\n' % \
             options.exit_word
-    return wvlib.load(options.vectors[0]).normalize(), options
+    if options.max_rank is not None and options.max_rank < 1:
+        raise ValueError('max-rank must be >= 1')
+    wv = wvlib.load(options.vectors[0], max_rank=options.max_rank)
+    return wv.normalize(), options
 
 def output_nearest(nearest, options, out=sys.stdout):
     if not options.quiet:
@@ -136,8 +141,11 @@ def main(argv=None):
     try:
         wv, options = process_options(argv[1:])
     except Exception, e:
-        print >> sys.stderr, 'Error: %s' % str(e)
-        return 1
+        if str(e):
+            print >> sys.stderr, 'Error: %s' % str(e)
+            return 1
+        else:
+            raise
     return query_loop(wv, options)
 
 if __name__ == '__main__':
