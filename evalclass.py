@@ -38,6 +38,8 @@ def argparser():
         import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
+    ap.add_argument('-r', '--max-rank', metavar='INT', default=None, 
+                    type=int, help='only consider r most frequent words')
     ap.add_argument('-q', '--quiet', default=False, action='store_true')
     ap.add_argument('vectors', nargs=1, help='word2vec word vectors')
     ap.add_argument('wordset', nargs='+', help='word sets', metavar='FILE')
@@ -130,7 +132,9 @@ def main(argv=None):
     if not enough_data(wordsets):
         return 1
 
-    wv = wvlib.load(options.vectors[0]).normalize()
+    if options.max_rank is not None and options.max_rank < 1:
+        raise ValueError('max-rank must be >= 1')
+    wv = wvlib.load(options.vectors[0], max_rank=options.max_rank).normalize()
     w2v = wv.word_to_vector_mapping()
 
     word_count, oov_count = 0, 0
