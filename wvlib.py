@@ -1081,11 +1081,17 @@ class Word2VecData(WVData):
     def read_binary_line(f, vsize):
         """Read line from file-like object f as word2vec binary format
         word and vector, return (word, vector)."""
-        
+
+        # terminal newlines are present in word2vec.c output but all
+        # versions of released word2vec binary format data, e.g. the
+        # GoogleNews-vectors-negative300.bin.gz file available from
+        # https://code.google.com/p/word2vec/ . To address the issue,
+        # allow newline as the initial character of words and remove
+        # it if present.
         word = Word2VecData.read_word(f)
+        if word.startswith('\n'):
+            word = word[1:]
         vector = numpy.fromfile(f, numpy.float32, vsize)
-        # discard terminal newline
-        f.read(1)
         return word, vector
 
     @staticmethod
