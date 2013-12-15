@@ -63,6 +63,8 @@ def argparser():
                     help='normalize vectors to unit length')
     ap.add_argument('-r', '--max-rank', metavar='INT', default=None, 
                     type=int, help='only consider r most frequent words')
+    ap.add_argument('-t', '--threshold', metavar='FLOAT', default=None,
+                    type=float, help='only output distances <= t')
     ap.add_argument('-w', '--whiten', default=False, action='store_true',
                     help='normalize features to unit variance ')
     ap.add_argument('-W', '--words',  default=False, action='store_true',
@@ -74,6 +76,8 @@ def process_options(args):
 
     if options.max_rank is not None and options.max_rank < 1:
         raise ValueError('max-rank must be >= 1')
+    if options.threshold is not None and options.threshold < 0.0:
+        raise ValueError('threshold must be >= 0')
 
     wv = wvlib.load(options.vectors[0], max_rank=options.max_rank)
 
@@ -97,6 +101,12 @@ def make_dist(vectors, options):
         vectors = [v/numpy.linalg.norm(v) for v in vectors]
         return vectors, lambda u, v: 1 - numpy.dot(u, v)
 
+def make_filter(options):
+    if options.threshold is None:
+        return lambda _: False
+    else:
+        return lambda d: d > options.threshold
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
@@ -112,6 +122,7 @@ def main(argv=None):
 
     m = options.min_index
     vectors, dist = make_dist(vectors, options)
+    dist_filter = make_filter(options)
 
     def index_str(i):
         if not options.words:
@@ -121,8 +132,10 @@ def main(argv=None):
 
     for i_j, v_u in izip(combinations(xrange(m, m+len(vectors)), 2),
                          combinations(vectors, 2)):
-        i, j, d = index_str(i_j[0]), index_str(i_j[1]), dist(v_u[0], v_u[1])
-        print '%s\t%s\t%f' % (i, j, d)
+        d = dist(v_u[0], v_u[1])
+        if dist_filter(d):
+            continue
+        print '%s\t%s\t%f' % (index_str(i_j[0]), index_str(i_j[1]), d)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
