@@ -72,6 +72,14 @@ neighbors.
 >>> for w in ["snowfall", "titanium", "craftsman", "apple", "anger",
 ...           "leukemia", "yuan", "club", "cylinder", "mandarin", "boat"]:
 ...     print w, wv.approximate_nearest(w)[0]
+
+Load word vectors, filter to top-ranking only, and get exact cosine
+similarity and approximate LSH-based similarity using 1000-bit hashes.
+
+>>> import wvlib
+>>> wv = wvlib.load('text8.tar.gz').filter_by_rank(1000)
+>>> wv.similarity('university', 'church')
+>>> wv.approximate_similarity('university', 'church', 1000)
 """
 
 import sys
@@ -153,6 +161,8 @@ class WVData(object):
         self._w2v_map = None
         self._normalized = False
         self._lsh = None
+        self._w2h_lsh = None
+        self._w2h_map = None
 
     def words(self):
         """Return list of words in the vocabulary."""
@@ -238,6 +248,39 @@ class WVData(object):
             v1, v2 = v1/numpy.linalg.norm(v1), v2/numpy.linalg.norm(v2)
         return numpy.dot(v1, v2)
 
+    def approximate_similarity(self, v1, v2, bits=None):
+        """Return approximate cosine similarity of given words or vectors.
+
+        Uses random hyperplane-based locality sensitive hashing (LSH)
+        with given number of bits. If bits is None, estimate number of
+        bits to use.
+
+        LSH is initialized on the first invocation, which may take
+        long for large numbers of word vectors. For a small number of
+        invocations, similarity() may be more efficient.
+        """
+
+        if self._w2h_lsh is None or (bits is not None and bits != self._w2h_lsh.bits):
+            self._w2h_lsh = self._initialize_lsh(bits, fill=False)
+            self._w2h_map = None
+
+        if self._w2h_map is None:
+            self._w2h_map = {}
+            logging.info('init word-to-hash map: start')
+            for w, v in self:
+                self._w2h_map[w] = self._w2h_lsh.hash(v)
+            logging.info('init word-to-hash map: done')
+            
+        hashes = []
+        for v in (v1, v2):
+            if isinstance(v, StringTypes):
+                h = self._w2h_map[v]
+            else:
+                h = self._w2h_lsh.hash(v)
+            hashes.append(h)
+
+        return self._w2h_lsh.hash_similarity(hashes[0], hashes[1])
+
     def nearest(self, v, n=10, exclude=None, candidates=None):
         """Return nearest n words and similarities for given word or vector,
         excluding given words.
@@ -291,7 +334,7 @@ class WVData(object):
         """
 
         if self._lsh is None or (bits is not None and bits != self._lsh.bits):
-            self._initialize_lsh(bits)
+            self._lsh = self._initialize_lsh(bits)
 
         if isinstance(v, StringTypes):
             v, w = self.word_to_unit_vector(v), v
@@ -311,22 +354,27 @@ class WVData(object):
                                 evalnum)
             return self.nearest(w, n, exclude, candidates)
 
-    def _initialize_lsh(self, bits):
+    def _lsh_bits(self, bits):
         if bits is None:
             w = self.config.word_count
             bits = max(4, int(math.ceil(math.log(w, 2))))
             logging.debug('init lsh: %d vectors, %d bits' % (w, bits))
+        return bits
+    
+    def _initialize_lsh(self, bits, fill=True):
+        bits = self._lsh_bits(bits)
+        lsh = RandomHyperplaneLSH(self.config.vector_dim, bits)
 
-        self._lsh = RandomHyperplaneLSH(self.config.vector_dim, bits)
-        for w, v in self:
-            self._lsh.add(v, (w, v))
-
-        lf = self._lsh.load_factor()
-        logging.debug('init lsh: load factor %.2f' % lf)
-        if lf < 0.1:
-            logging.warning('low lsh load factor (%f), neighbors searches '
-                            'may be slow' % lf)
-
+        if fill:
+            for w, v in self:
+                lsh.add(v, (w, v))
+            lf = lsh.load_factor()
+            logging.debug('init lsh: load factor %.2f' % lf)
+            if lf < 0.1:
+                logging.warning('low lsh load factor (%f), neighbors searches '
+                                'may be slow' % lf)
+        return lsh
+                
     def normalize(self):
         """Normalize word vectors.
 
@@ -1148,6 +1196,9 @@ class RandomHyperplaneLSH(object):
         self.vectors = [v/numpy.linalg.norm(v) for v in self.vectors]
         self._values = {}
         self._entries = 0
+        # hamming distance to approximate cosine mapping (avoid trig funcs)
+        self._hd_to_cos = dict((i, hash_cosine_similarity(0, (1<<i)-1, bits))
+                               for i in range(bits+1))
 
     def hash(self, v):
         """Return hash for given vector."""
@@ -1169,7 +1220,12 @@ class RandomHyperplaneLSH(object):
             v1 = self.hash(v1)
         if not isinstance(v2, (int, long)):
             v2 = self.hash(v2)
-        return self.hash_similarity(v1, v2, self.bits)
+        return self.hash_similarity(v1, v2)
+
+    def hash_similarity(self, h1, h2):
+        """Return approximate cosine similarity of given hashes."""
+
+        return self._hd_to_cos[bin(h1^h2).count('1')]
 
     def neighbors(self, h, min_dist=0, number=None):
         """Yield neighbors of given hash or vector ordered by
@@ -1292,6 +1348,10 @@ def hash_similarity(h1, h2, bits):
     # 1 - (Hamming distance/max Hamming distance).
     # set bit count per http://stackoverflow.com/a/9831671
     return 1 - bin(h1^h2).count('1')/float(bits)
+
+def hash_cosine_similarity(h1, h2, bits):
+    # approximate cosine similarity for random hyperplane LSH hashes
+    return math.cos((1-hash_similarity(h1, h2, bits)) * math.pi)
     
 def unit_vector(v):
     return v/numpy.linalg.norm(v)
