@@ -111,11 +111,9 @@ def get_query(prompt='', multiword=False, exit_word=None, max_phrases=None):
         while True:
             line = get_line('', exit_word)
             if not line or line.isspace():
-                print "blank break"
                 break
             query.append(line.split())
             if max_phrases and len(query) >= max_phrases:
-                print "len break"
                 break
     return query
 
