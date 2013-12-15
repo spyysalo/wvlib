@@ -13,7 +13,7 @@ for input and output.
 Variables:
 
 formats -- list of formats recognized by load().
-
+output_formats -- list of formats recognized by WVData.save()
 vector_formats -- list of vector formats recognized by WVData.save()
 
 Functions:
@@ -135,7 +135,7 @@ NUMPY_FORMAT = 'npy'
 TSV_FORMAT = 'tsv'
 
 formats = sorted(list(set(extension_format_map.values())))
-
+output_formats = sorted([WVLIB_FORMAT])
 vector_formats = sorted([NUMPY_FORMAT, TSV_FORMAT])
 
 class FormatError(Exception):
@@ -1295,44 +1295,3 @@ def hash_similarity(h1, h2, bits):
     
 def unit_vector(v):
     return v/numpy.linalg.norm(v)
-
-### CLI stuff
-
-def argparser():
-    try:
-        import argparse
-    except ImportError:
-        import compat.argparse as argparse
-
-    ap=argparse.ArgumentParser()
-    ap.add_argument('vectors', metavar='FILE', help='vectors to load')
-    ap.add_argument('-f', '--format', default=None, choices=formats,
-                    help='input FILE format')
-    ap.add_argument('-v', '--vector_format', default=None, 
-                    choices=vector_formats,
-                    help='output vector format (with -o)')
-    ap.add_argument('-o', '--output', metavar='FILE/DIR', default=None,
-                    help='save vectors to file or directory')
-    ap.add_argument('-n', '--nearest', metavar='WORD', default=None,
-                    help='output words nearest to given word')
-    return ap
-
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
-
-    options = argparser().parse_args(argv[1:])
-
-    wv = load(options.vectors, options.format)
-
-    if options.nearest:
-        print '\n'.join(str(n) for n in wv.nearest(options.nearest))
-
-    if options.output:
-        wv.save(options.output, vector_format=options.vector_format)
-
-    return 0
-
-if __name__ == '__main__':
-    sys.exit(main(sys.argv))
-
