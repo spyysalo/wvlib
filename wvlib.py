@@ -111,6 +111,20 @@ try:
 except ImportError:
     from compat.ordereddict import OrderedDict
 
+try:
+    from gmpy import popcount
+    with_gmpy = True
+except ImportError:
+    # TODO: counting the number of set bits can take > 90% of the
+    # overall runtime in LSH-heavy programs. bin(i).count('1') is
+    # apparently the fastest pure python approach
+    # (http://stackoverflow.com/a/9831671), but remains so slow that
+    # using exact similarity can be faster overall. gmpy should be
+    # installed for a fast popcount() implementation.
+    def popcount(i):
+        return bin(i).count('1')
+    with_gmpy = False
+
 logging.getLogger().setLevel(logging.DEBUG)
 
 DEFAULT_ENCODING = "UTF-8"
@@ -261,16 +275,16 @@ class WVData(object):
         """
 
         if self._w2h_lsh is None or (bits is not None and bits != self._w2h_lsh.bits):
+            if not with_gmpy:
+                logging.warning('gmpy not available, approximate similarity '
+                                'may be slow.')
             self._w2h_lsh = self._initialize_lsh(bits, fill=False)
-            self._w2h_map = None
-
-        if self._w2h_map is None:
             self._w2h_map = {}
             logging.info('init word-to-hash map: start')
             for w, v in self:
                 self._w2h_map[w] = self._w2h_lsh.hash(v)
-            logging.info('init word-to-hash map: done')
-            
+            logging.info('init word-to-hash map: done')            
+
         hashes = []
         for v in (v1, v2):
             if isinstance(v, StringTypes):
@@ -1225,7 +1239,7 @@ class RandomHyperplaneLSH(object):
     def hash_similarity(self, h1, h2):
         """Return approximate cosine similarity of given hashes."""
 
-        return self._hd_to_cos[bin(h1^h2).count('1')]
+        return self._hd_to_cos[popcount(h1^h2)]
 
     def neighbors(self, h, min_dist=0, number=None):
         """Yield neighbors of given hash or vector ordered by
