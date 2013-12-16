@@ -24,6 +24,8 @@ def argparser():
 
     ap=argparse.ArgumentParser()
     ap.add_argument('vectors', nargs=1, metavar='FILE', help='word vectors')
+    ap.add_argument('-a', '--approximate', default=False, action='store_true',
+                    help='search by approximate similarity')
     ap.add_argument('-e', '--echo', default=False, action='store_true',
                     help='echo query word(s)')
     ap.add_argument('-m', '--multiword', default=False, action='store_true',
@@ -75,7 +77,10 @@ def process_query(wv, query, options=None):
             print '\nWord: %s  Position in vocabulary: %d' % (w, wv.rank(w))    
 
     nncount = options.number if options else 10
-    nearest = wv.nearest(vector, n=nncount, exclude=words)
+    if options is None or not options.approximate:
+        nearest = wv.nearest(vector, n=nncount, exclude=words)
+    else:
+        nearest = wv.approximate_nearest(vector, n=nncount, exclude=words)
     output_nearest(nearest, options)
 
     return True
