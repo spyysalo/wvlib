@@ -323,14 +323,14 @@ class WVData(object):
         return wordsim[:n]
 
     def approximate_nearest(self, v, n=10, exclude=None, 
-                            evalnum=1000, bits=None,
+                            exact_eval=0.1, bits=None,
                             search_hash_neighborhood=True):
         """Return approximate nearest n words and similarities for
         given word or vector, excluding given words.
 
         Uses random hyperplane-based locality sensitive hashing (LSH)
-        with given number of bits, evaluating evalnum approximate
-        neighbors exactly.
+        with given number of bits, evaluating a number of approximate
+        neighbors exactly (exact_eval argument).
 
         LSH is initialized on the first invocation, which may take
         long for large numbers of word vectors. For a small number of
@@ -343,9 +343,15 @@ class WVData(object):
 
         If v is a string, look up the corresponding word vector.
         If exclude is None and v is a string, exclude v.
+        If 0 < exact_eval < 1, evaluate that fraction of the
+        vocabulary exactly, otherwise evaluate up to exact_eval words.
         If bits is None, estimate number of bits to use.
         Return value is a list of (word, similarity) pairs.
         """
+
+        if exact_eval < 1.0:
+            exact_eval = int(len(self.words()) * exact_eval)
+            logging.info('evaluating %d words exactly' % exact_eval)
 
         if self._lsh is None or (bits is not None and bits != self._lsh.bits):
             self._lsh = self._initialize_lsh(bits)
@@ -356,16 +362,16 @@ class WVData(object):
             v, w = v/numpy.linalg.norm(v), v
 
         if search_hash_neighborhood:
-            candidates = islice(self._lsh.neighbors(v), evalnum)
+            candidates = islice(self._lsh.neighbors(v), exact_eval)
             return self.nearest(w, n, exclude, candidates)
         else:
-            # evalnum nearest by hash similarity
+            # exact_eval nearest by hash similarity
             sim = partial(self._lsh.item_similarity, h=self._lsh.hash(v), 
                           bits=self._lsh.bits)
-            anearest = heapq.nlargest(evalnum, self._lsh.iteritems(), sim)
-            # nearest vectors for up to evalnum of nearest hashes
+            anearest = heapq.nlargest(exact_eval, self._lsh.iteritems(), sim)
+            # nearest vectors for up to exact_eval of nearest hashes
             candidates = islice((wv for _, wvs in anearest for wv in wvs), 
-                                evalnum)
+                                exact_eval)
             return self.nearest(w, n, exclude, candidates)
 
     def _lsh_bits(self, bits):
