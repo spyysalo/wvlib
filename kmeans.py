@@ -39,6 +39,8 @@ def argparser():
 
     ap=argparse.ArgumentParser()
     ap.add_argument('vectors', nargs=1, metavar='FILE', help='word vectors')
+    ap.add_argument('-j', '--jobs', default=1, type=int,
+                    help='number of parallel jobs')
     ap.add_argument('-k', default=None, type=int,
                     help='number of clusters (default sqrt(words/2))')
     ap.add_argument('-m', '--method', default=DEFAULT_METHOD, choices=methods,
@@ -62,6 +64,10 @@ def process_options(args):
     if options.method == MINIBATCH_KMEANS and not with_sklearn:
         logging.warning('minibatch kmeans not available, using kmeans (slow)')
         options.method = KMEANS
+
+    if options.jobs != 1 and (options.method != KMEANS or not with_sklearn):
+        logging.warning('jobs > 1 only supported scikit-learn %s' % KMEANS)
+        options.jobs = 1
 
     wv = wvlib.load(options.vectors[0], max_rank=options.max_rank)
 
@@ -90,11 +96,19 @@ def minibatch_kmeans(vectors, k):
     kmeans.fit(vectors)
     return kmeans.labels_
 
-def kmeans(vectors, k):
+def kmeans(vectors, k, jobs=1):
     vectors = numpy.array(vectors)
-    codebook, distortion = scipy.cluster.vq.kmeans(vectors, k)
-    cluster_ids, dist = scipy.cluster.vq.vq(vectors, codebook)
-    return cluster_ids
+    if with_sklearn:
+        if jobs == 1:
+            kmeans = sklearn.cluster.KMeans(k)
+        else:
+            kmeans = sklearn.cluster.KMeans(k, n_jobs=jobs) # sklearn > 0.10
+        kmeans.fit(vectors)
+        return kmeans.labels_
+    else:
+        codebook, distortion = scipy.cluster.vq.kmeans(vectors, k)
+        cluster_ids, dist = scipy.cluster.vq.vq(vectors, codebook)
+        return cluster_ids
 
 def write_cluster_ids(words, cluster_ids, out=None):
     """Write given list of words and their corresponding cluster ids to out."""
@@ -120,7 +134,7 @@ def main(argv=None):
             raise
 
     if options.method == KMEANS:
-        cluster_ids = kmeans(vectors, options.k)
+        cluster_ids = kmeans(vectors, options.k, options.jobs)
     elif options.method == MINIBATCH_KMEANS:
         cluster_ids = minibatch_kmeans(vectors, options.k)
     else:
