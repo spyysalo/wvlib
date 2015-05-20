@@ -166,6 +166,7 @@ class FormatError(Exception):
 class WVData(object):
     TAR = 'tar'
     DIR = 'dir'
+    BIN = 'bin'
 
     def __init__(self, config, vocab, vectors):
         # TODO: check config-vocab-vectors consistency
@@ -443,6 +444,8 @@ class WVData(object):
                 return self.save_tar(name)
             elif format == self.DIR:
                 return self.save_dir(name)
+            elif format == self.BIN:
+                return self.save_bin(name)
             else:
                 raise NotImplementedError
         finally:
@@ -481,6 +484,25 @@ class WVData(object):
         self.config.save(os.path.join(name, CONFIG_NAME))
         self.vocab.save(os.path.join(name, VOCAB_NAME))
         self._vectors.save(os.path.join(name, vecfile_name))
+
+    def save_bin(self, name, max_rank=-1):
+        """Save to directory a .bin file doesn't use the newlines"""
+        vector_matrix=self.vectors() #list of ndarrays... whoa!
+        if max_rank:
+            to_save=max(max_rank, len(vector_matrix))
+        else:
+            to_save=len(vector_matrix)
+        words=self.words()
+        with open(name,"wb") as f:
+            f.write("%d %d\n"%(to_save,len(vector_matrix[0])))
+            for i in range(to_save):
+                if isinstance(words[i],unicode):
+                    f.write(words[i].encode("utf8"))
+                else:
+                    f.write(words[i])
+                f.write(" ")
+                vector_matrix[i].astype(numpy.float32).tofile(f)
+            f.flush()
 
     def _invalidate(self):
         """Invalidate cached values."""
