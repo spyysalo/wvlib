@@ -1145,7 +1145,12 @@ class Word2VecData(WVData):
         l = f.readline().rstrip(' \n')
         fields = l.split(' ')
         try:
-            return fields[0], numpy.array([float(f) for f in fields[1:]])
+            try:
+                w=unicode(fields[0],"utf-8")
+            except:
+                print >> sys.stderr, "Unicode decode error", w
+                w=unicode(fields[0],"utf-8",errors='replace')
+            return w, numpy.array([float(f) for f in fields[1:]])
         except ValueError:
             raise FormatError('expected word and floats, got "%s"' % l)
         if len(vec) != vsize:
@@ -1167,7 +1172,12 @@ class Word2VecData(WVData):
             if not c:
                 raise FormatError("preliminary end of file")
             wchars.append(c)
-        return ''.join(wchars)
+        try:
+            return (''.join(wchars)).decode("utf-8")
+        except:
+            #I do not understand why this happens, this used to be fine in word2vec output!
+            print >> sys.stderr, "Unicode decode error", ''.join(wchars)
+            return (''.join(wchars)).decode("utf-8",errors='replace')
 
     @staticmethod
     def read_binary_line(f, vsize):
@@ -1181,7 +1191,7 @@ class Word2VecData(WVData):
         # allow newline as the initial character of words and remove
         # it if present.
         word = Word2VecData.read_word(f)
-        if word.startswith('\n'):
+        if word.startswith(u'\n'):
             word = word[1:]
         vector = numpy.fromfile(f, numpy.float32, vsize)
         return word, vector
