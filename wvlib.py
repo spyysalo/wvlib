@@ -28,7 +28,7 @@ Word2VecData -- WVData for word2vec vectors.
 Examples:
 
 Load word2vec vectors from "vectors.bin", save in wvlib format in
-"vectors.tar.gz":
+vectors.tar.gz":
 
 >>> import wvlib
 >>> wv = wvlib.load("vectors.bin")
@@ -834,10 +834,12 @@ class Vectors(object):
 
 class Vocabulary(object):
     def __init__(self, word_freq):
+        word_freq=list(word_freq)
         assert not any((j for i, j in pairwise(word_freq) if i[1] < j[1])), \
             'words not ordered by descending frequency'
         self.word_freq = OrderedDict(word_freq)
         self._rank = None
+
 
     def words(self):
         return self.word_freq.keys()
@@ -1057,13 +1059,13 @@ class OneHotWVData(WVData):
         
 class Word2VecData(WVData):
 
-    def __init__(self, data):
-        config = Config.default(len(data), len(data[0][1]))
+    def __init__(self, words, vector_matrix):
+        config = Config.default(*vector_matrix.shape)
         logging.warning('word2vec load: filling in 0s for word counts')
-        vocab = Vocabulary([(row[0], 0) for row in data])
-        vectors = Vectors([row[1] for row in data])
+        vocab = Vocabulary(((w,0) for w in words))
+        vectors = Vectors(vector_matrix)
         super(Word2VecData, self).__init__(config, vocab, vectors)
-        self.w2vdata = data
+        #self.w2vdata = #...I don't think this was used for anything
 
     @classmethod
     def load_textf(cls, f, max_rank=None):
@@ -1073,7 +1075,7 @@ class Word2VecData(WVData):
         If max_rank is not None, only load max_rank most frequent words.
         """
 
-        return cls(cls.read(f, cls.read_text_line, max_rank=max_rank))
+        return cls(*cls.read(f, cls.read_text_line, max_rank=max_rank))
 
     @classmethod
     def load_binaryf(cls, f, max_rank=None):
@@ -1083,7 +1085,7 @@ class Word2VecData(WVData):
         If max_rank is not None, only load max_rank most frequent words.
         """
 
-        return cls(cls.read(f, cls.read_binary_line, max_rank=max_rank))
+        return cls(*cls.read(f, cls.read_binary_line, max_rank=max_rank))
 
     @classmethod
     def load_binary(cls, name, max_rank=None):
@@ -1194,14 +1196,17 @@ class Word2VecData(WVData):
         """
         
         wcount, vsize = Word2VecData.read_size_line(f)
-        rows = []
+        words = []
         if max_rank is not None and wcount > max_rank:
             wcount = max_rank
+        vector_data=numpy.zeros((wcount,vsize),numpy.float32)
         for i in range(wcount):
-            rows.append(read_line(f, vsize))
-        if len(rows) != wcount:
+            word,vec=read_line(f, vsize)
+            vector_data[i]=vec
+            words.append(word)
+        if len(words) != wcount:
             raise FormatError('expected %d words, got %d' % (wcount, len(rows)))
-        return rows
+        return words,vector_data
 
     @staticmethod
     def is_w2v_textf(f):
