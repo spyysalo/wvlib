@@ -93,9 +93,14 @@ import logging
 
 import traceback
 import numpy
-import numpy.numarray
 import scipy.sparse
 import heapq
+
+try:
+    import numpy.numarray
+    with_numarray = True
+except ImportError:
+    with_numarray = False
 
 from functools import partial
 from itertools import tee, izip, islice
@@ -776,7 +781,7 @@ class Vectors(object):
 
         #We'll need to hack into the npy format to make this happen
         # https://github.com/numpy/numpy/blob/master/doc/neps/npy-format.txt
-        if max_rank is not None: 
+        if max_rank is not None and with_numarray:
             magic_string=f.read(6)
             if magic_string!='\x93NUMPY':
                 raise ValueError('The input does not seem to be an NPY file (magic string does not match).')
@@ -790,6 +795,11 @@ class Vectors(object):
             array=array.reshape(new_shape)
             v=cls(array)
         else:
+            if max_rank is not None:
+                # numpy.numarray is gone in numpy 1.9, the hack used
+                # for partial load will no longer work
+                logging.warning('no numpy.numarray, -r disabled for numpy data')
+                # TODO: reshape anyway
             v = cls(numpy.load(f))
         return v
 
