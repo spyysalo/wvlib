@@ -60,7 +60,7 @@ def query_loop(wv, options):
             continue
         if len(query) > 2:
             print >> sys.stderr, 'Ignoring words/phrases after the second'
-            query = query[:3]
+            query = query[:2]
         process_query(wv, query, options)
 
 def main(argv=None):
