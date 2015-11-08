@@ -157,6 +157,7 @@ extension_format_map = {
     '.tar.gz' : WVLIB_FORMAT,
     '.tar.bz2' : WVLIB_FORMAT,
     '.classes' : CID_FORMAT,
+    '.sdv' : SDV_FORMAT,
 }
 
 # supported vector formats and filename extensions
@@ -164,7 +165,7 @@ NUMPY_FORMAT = 'npy'
 TSV_FORMAT = 'tsv'
 
 formats = sorted(list(set(extension_format_map.values())))
-output_formats = sorted([WVLIB_FORMAT])
+output_formats = sorted([WVLIB_FORMAT, WORD2VEC_BIN, SDV_FORMAT])
 vector_formats = sorted([NUMPY_FORMAT, TSV_FORMAT])
 
 class FormatError(Exception):
@@ -173,7 +174,6 @@ class FormatError(Exception):
 class WVData(object):
     TAR = 'tar'
     DIR = 'dir'
-    BIN = 'bin'
 
     def __init__(self, config, vocab, vectors):
         # TODO: check config-vocab-vectors consistency
@@ -451,8 +451,10 @@ class WVData(object):
                 return self.save_tar(name)
             elif format == self.DIR:
                 return self.save_dir(name)
-            elif format == self.BIN:
+            elif format == WORD2VEC_BIN:
                 return self.save_bin(name)
+            elif format == SDV_FORMAT:
+                return self.save_sdv(name)
             else:
                 raise NotImplementedError
         finally:
@@ -493,7 +495,7 @@ class WVData(object):
         self._vectors.save(os.path.join(name, vecfile_name))
 
     def save_bin(self, name, max_rank=-1):
-        """Save to directory a .bin file doesn't use the newlines"""
+        """Save in word2vec binary format without newlines."""
         vector_matrix=self.vectors() #list of ndarrays... whoa!
         if max_rank:
             to_save=max(max_rank, len(vector_matrix))
@@ -510,6 +512,13 @@ class WVData(object):
                 f.write(" ")
                 vector_matrix[i].astype(numpy.float32).tofile(f)
             f.flush()
+
+    def save_sdv(self, name):
+        """Save in space-delimited values format."""
+        words, vectors = self.words(), self.vectors()
+        with open(name, 'wt') as f:
+            for w, v in self:
+                print >> f, w, ' '.join(str(i) for i in v)
 
     def _invalidate(self):
         """Invalidate cached values."""
@@ -637,8 +646,14 @@ class WVData(object):
     def guess_format(name):
         if os.path.isdir(name):
             return WVData.DIR
-        else:
+        elif (name.endswith('.tar') or name.endswith('.gz') or name.endswith('.tgz') or name.endswith('.bz2')):
             return WVData.TAR
+        elif name.endswith('.bin'):
+            return WORD2VEC_BIN
+        elif name.endswith('.sdv'):
+            return SDV_FORMAT
+        else:
+            return None
 
 class _FileInfo(object):
     """Implements minimal part of TarInfo interface for files."""
