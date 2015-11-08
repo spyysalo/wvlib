@@ -24,6 +24,7 @@ Classes:
 
 WVData -- represents word vectors and related data.
 Word2VecData -- WVData for word2vec vectors.
+SdvData -- WVData for space-delimited values vectors.
 
 Examples:
 
@@ -146,9 +147,10 @@ WORD2VEC_TEXT = 'w2vtxt'
 WORD2VEC_BIN = 'w2vbin'
 WVLIB_FORMAT = 'wvlib'
 CID_FORMAT = 'cid'
+SDV_FORMAT = 'sdv'
 
 extension_format_map = {
-    '.txt' : WORD2VEC_TEXT,
+    '.tsv' : SDV_FORMAT,
     '.bin' : WORD2VEC_BIN,
     '.tar' : WVLIB_FORMAT,
     '.tgz' : WVLIB_FORMAT,
@@ -878,7 +880,7 @@ class Vocabulary(object):
         """Save as TSV to pathname name."""
 
         with codecs.open(name, 'wt', encoding=encoding) as f:
-                return self.savef(f)
+            return self.savef(f)
 
     def _invalidate(self):
         """Invalidate cached values."""
@@ -1064,7 +1066,42 @@ class OneHotWVData(WVData):
         
         with codecs.open(name, 'rt', encoding=encoding) as f:
             return cls.loadf(f, max_rank=max_rank)
-        
+
+class SdvData(WVData):
+    def __init__(self, data):
+        config = Config.default(len(data), len(data[0][1]))
+        logging.warning('sdv load: filling in 0s for word counts')
+        vocab = Vocabulary([(row[0], 0) for row in data])
+        vectors = Vectors([row[1] for row in data])
+        super(SdvData, self).__init__(config, vocab, vectors)
+        self.sdvdata = data
+
+    @classmethod
+    def load(cls, name, encoding=DEFAULT_ENCODING, max_rank=None):
+        """Return SdvData from pathname name in the space-delimited
+        values format.
+
+        If max_rank is not None, only load max_rank first words.
+        """
+        with codecs.open(name, 'rU', encoding=encoding) as f:
+            return cls.loadf(f, max_rank)
+
+    @classmethod
+    def loadf(cls, f, max_rank=None):
+        rows = []
+        for i, l in enumerate(f):
+            if max_rank is not None and i >= max_rank:
+                break
+            fields = l.rstrip(' \n').split()
+            try:
+                v = numpy.array([float(f) for f in fields[1:]])
+            except ValueError:
+                raise FormatError('expected word and floats, got "%s"' % l)
+            rows.append((fields[0], v))
+            if (i+1) % 10000 == 0:
+                logging.debug('read %d SDV rows' % (i+1))
+        return cls(rows)
+
 class Word2VecData(WVData):
 
     def __init__(self, data):
@@ -1156,9 +1193,6 @@ class Word2VecData(WVData):
             return fields[0], numpy.array([float(f) for f in fields[1:]])
         except ValueError:
             raise FormatError('expected word and floats, got "%s"' % l)
-        if len(vec) != vsize:
-            raise FormatError('expected vector of size %d, got %d for "%s"' %
-                              (vsize, len(v), word))
 
     @staticmethod
     def read_word(f):
@@ -1327,7 +1361,18 @@ class RandomHyperplaneLSH(object):
     def item_similarity(i, h, bits):
         return hash_similarity(i[0], h, bits)
 
+def _detect_txt_format(name, encoding=DEFAULT_ENCODING):
+    """Return format based on contents of file contents."""
+    if Word2VecData.is_w2v_text(name, encoding):
+        return WORD2VEC_TEXT
+    else:
+        return SDV_FORMAT    # TODO: check, don't just assume
+
 def _guess_format(name):
+    # .txt could be word2vec text or space-delimited values, decide
+    # based on contents
+    if name.endswith('.txt'):
+        return _detect_txt_format(name)
     for ext, format in extension_format_map.items():
         if name.endswith(ext):
             return format
@@ -1335,7 +1380,16 @@ def _guess_format(name):
         return WVLIB_FORMAT
     return None
 
-def load(name, format=None, max_rank=None):
+_load_func = {
+    WVLIB_FORMAT: WVData.load,
+    SDV_FORMAT: SdvData.load,
+    WORD2VEC_FORMAT: Word2VecData.load,
+    WORD2VEC_TEXT: Word2VecData.load_text,
+    WORD2VEC_BIN: Word2VecData.load_binary,
+    CID_FORMAT: OneHotWVData.load,
+}
+
+def load(name, format_=None, max_rank=None):
     """Load word vectors from pathname name in format.
 
     If format is None, determine format heuristically.
@@ -1344,26 +1398,19 @@ def load(name, format=None, max_rank=None):
 
     if not os.path.exists(name):
         raise IOError('no such file or directory: %s' % name)
-    if format is None:
-        format = _guess_format(name)
-    if format is None:
+    if format_ is None:
+        format_ = _guess_format(name)
+    if format_ is None:
         raise FormatError('failed to guess format: %s' % name)
 
-    logging.info('loading %s as %s' % (name, format))
+    logging.info('loading %s as %s' % (name, format_))
 
-    if format == WVLIB_FORMAT:
-        load_func = WVData.load
-    elif format == WORD2VEC_FORMAT: # binary vs. text unspecified
-        load_func = Word2VecData.load
-    elif format == WORD2VEC_TEXT:
-        load_func = Word2VecData.load_text
-    elif format == WORD2VEC_BIN:
-        load_func = Word2VecData.load_binary
-    elif format == CID_FORMAT:
-        load_func = OneHotWVData.load
-    else:
+    load_func = _load_func.get(format_, None)
+
+    if load_func is None:
         raise NotImplementedError        
-    return load_func(name, max_rank=max_rank)
+    else:
+        return load_func(name, max_rank=max_rank)
 
 ### misc. helper functions
 
