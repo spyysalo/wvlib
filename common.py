@@ -108,7 +108,7 @@ def query_loop(wv, options, process_query, query_count=1):
         words, missing = [w for q in query for w in q], []
         for w in uniq(words):
             if w not in wv:
-                print >> sys.stderr, 'Out of dictionary word: %s' % str(m)
+                print >> sys.stderr, 'Out of dictionary word: %s' % str(w)
                 missing.add(w)
             elif not options.quiet:
                 print 'Word: %s  Position in vocabulary: %d' % (w, wv.rank(w))
