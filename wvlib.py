@@ -442,7 +442,7 @@ class WVData(object):
             if format is None:
                 format = self.guess_format(name)
             if format is None:
-                raise ArgumentError('failed to guess format for %s' % name)
+                raise ValueError('failed to guess format for %s' % name)
 
             logging.info('saving %s as %s with %s vectors' % 
                          (name, format, self.config.format))
@@ -857,7 +857,7 @@ class Vectors(object):
         elif format == NUMPY_FORMAT:
             return False
         else:
-            raise ArgumentError('Unknown format %s' % format)
+            raise ValueError('Unknown format %s' % format)
 
 class Vocabulary(object):
     def __init__(self, word_freq):
