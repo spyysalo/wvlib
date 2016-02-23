@@ -94,7 +94,6 @@ import logging
 
 import traceback
 import numpy
-import scipy.sparse
 import heapq
 
 try:
