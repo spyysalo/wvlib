@@ -863,6 +863,8 @@ class Vocabulary(object):
         assert not any((j for i, j in pairwise(word_freq) if i[1] < j[1])), \
             'words not ordered by descending frequency'
         self.word_freq = OrderedDict(word_freq)
+        assert len(self.word_freq) == len(word_freq), \
+            'vocab has duplicates: %s' % (' '.join(duplicates(w for w, f in word_freq)))
         self._rank = None
 
     def words(self):
@@ -1102,7 +1104,7 @@ class SdvData(WVData):
 
     @classmethod
     def loadf(cls, f, max_rank=None):
-        rows = []
+        rows, dim = [], None
         for i, l in enumerate(f):
             if max_rank is not None and i >= max_rank:
                 break
@@ -1111,6 +1113,10 @@ class SdvData(WVData):
                 v = numpy.array([float(f) for f in fields[1:]])
             except ValueError:
                 raise FormatError('expected word and floats, got "%s"' % l)
+            if dim is None:
+                dim = len(v)
+            elif len(v) != dim:
+                raise FormatError('expected %d values, got %s' % (dim, len(v)))
             rows.append((fields[0], v))
             if (i+1) % 10000 == 0:
                 logging.debug('read %d SDV rows' % (i+1))
@@ -1434,6 +1440,15 @@ def pairwise(iterable):
     a, b = tee(iterable)
     next(b, None)
     return izip(a, b)
+
+def duplicates(iterable):
+    seen, dups = set(), set()
+    for i in iterable:
+        if i not in seen:
+            seen.add(i)
+        else:
+            dups.add(i)
+    return dups
 
 # transated from http://www.hackersdelight.org/hdcodetxt/snoob.c.txt
 def lex_next_bits(i):
