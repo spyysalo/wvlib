@@ -4,12 +4,15 @@
 
 import sys
 import codecs
+import logging
 
 import numpy
 import wvlib
 
 from os.path import basename, splitext
+from collections import OrderedDict
 from scipy.stats import spearmanr
+from logging import info
 
 DEFAULT_ENCODING = 'UTF-8'
 
@@ -42,14 +45,23 @@ def evaluate(wv, reference):
     Spearman's rho and count is the number of reference word pairs
     that could be evaluated against.
     """
-    gold, predicted = [], []
+    gold, predicted, oov = [], [], OrderedDict()
     for words, sim in sorted(reference, key=lambda ws: ws[1]):
+        w1, w2, v1, v2 = words[0], words[1], None, None
         try:
-            v1, v2 = wv[words[0]], wv[words[1]]
+            v1 = wv[w1]
         except KeyError:
+            oov[w1] = True
+        try:
+            v2 = wv[w2]
+        except KeyError:
+            oov[w2] = True
+        if v1 is None or v2 is None:
             continue
         gold.append((words, sim))
         predicted.append((words, cosine(v1, v2)))
+    if oov:
+        info('OOV: ' + ', '.join(oov.keys()))
     simlist = lambda ws: [s for w,s in ws]
     rho, p = spearmanr(simlist(gold), simlist(predicted))
     return (rho, len(gold))
