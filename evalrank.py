@@ -26,6 +26,8 @@ def argparser():
         import compat.argparse as argparse
 
     ap=argparse.ArgumentParser()
+    ap.add_argument('-l', '--lowercase', default=None, action='store_true',
+                    help='lowercase words in reference')
     ap.add_argument('-r', '--max-rank', metavar='INT', default=None, 
                     type=int, help='only consider r most frequent words')
     ap.add_argument('-q', '--quiet', default=False, action='store_true')
@@ -66,7 +68,7 @@ def evaluate(wv, reference):
     rho, p = spearmanr(simlist(gold), simlist(predicted))
     return (rho, len(gold))
     
-def read_reference(name, encoding=DEFAULT_ENCODING):
+def read_reference(name, options=None, encoding=DEFAULT_ENCODING):
     """Return similarity ranking data as list of ((w1, w2), sim) tuples."""
     data = []
     with codecs.open(name, 'rU', encoding=encoding) as f:
@@ -77,6 +79,8 @@ def read_reference(name, encoding=DEFAULT_ENCODING):
                 fields = line.strip().split()
             if len(fields) != 3:
                 raise FormatError(line)
+            if options and options.lowercase:
+                fields[0], fields[1] = fields[0].lower(), fields[1].lower()
             try:
                 data.append(((fields[0], fields[1]), float(fields[2])))
             except ValueError:
@@ -100,7 +104,7 @@ def main(argv=None):
     except Exception, e:
         print >> sys.stderr, 'Error: %s' % str(e)
         return 1    
-    references = [(r, read_reference(r)) for r in options.references]
+    references = [(r, read_reference(r, options)) for r in options.references]
 
     print '%20s\trho\tmissed\ttotal\tratio' % 'dataset'
     for name, ref in references:
