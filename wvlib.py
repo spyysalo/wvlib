@@ -157,6 +157,7 @@ extension_format_map = {
     '.tar.bz2' : WVLIB_FORMAT,
     '.classes' : CID_FORMAT,
     '.sdv' : SDV_FORMAT,
+    '.vec' : WORD2VEC_TEXT,    # fastText vector output
 }
 
 # supported vector formats and filename extensions
@@ -1258,6 +1259,8 @@ class Word2VecData(WVData):
         """
         
         wcount, vsize = Word2VecData.read_size_line(f)
+        logging.debug('reading %d vectors of size %d' % (wcount, vsize))
+
         rows = []
         if max_rank is not None and wcount > max_rank:
             wcount = max_rank
