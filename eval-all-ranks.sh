@@ -11,4 +11,4 @@ SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo "Evaluating $VEC on word rankings in $DIR" >&2
 
-python "$SCRIPTDIR/evalrank.py" "$VEC" `find "$DIR" -name '*.txt'`
+python "$SCRIPTDIR/evalrank.py" -q "$VEC" `find "$DIR" -name '*.txt'`
