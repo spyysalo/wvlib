@@ -5,11 +5,12 @@ set -e
 
 VEC=${1:-text8.tar.gz}
 DIR=${2:-word-classes/}
+set +e; shift; shift; set -e
 
 echo "Evaluating $VEC on classes in $DIR" >&2
 
 for d in $DIR/*; do
     if [ -d $d ]; then
-	echo `basename $d`: `python evalclass.py -q $VEC $d/*.txt`
+	echo `basename $d`: `python evalclass.py "$@" -q $VEC $d/*.txt`
     fi
 done
