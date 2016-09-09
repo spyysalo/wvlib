@@ -1208,7 +1208,10 @@ class Word2VecData(WVData):
         """Read line from file-like object f as word2vec text format
         and word vector, return (word, vector)."""
 
-        l = f.readline().rstrip(' \n')
+        l = f.readline()
+        if not l:
+            raise FormatError('premature end of file')
+        l = l.rstrip(' \n')
         fields = l.split(' ')
         try:
             return fields[0], numpy.array([float(f) for f in fields[1:]])
@@ -1228,7 +1231,7 @@ class Word2VecData(WVData):
             if c == ' ':
                 break
             if not c:
-                raise FormatError("preliminary end of file")
+                raise FormatError("premature end of file")
             wchars.append(c)
         return ''.join(wchars)
 
@@ -1237,7 +1240,7 @@ class Word2VecData(WVData):
         """Read line from file-like object f as word2vec binary format
         word and vector, return (word, vector)."""
 
-        # terminal newlines are present in word2vec.c output but all
+        # terminal newlines are present in word2vec.c output but not all
         # versions of released word2vec binary format data, e.g. the
         # GoogleNews-vectors-negative300.bin.gz file available from
         # https://code.google.com/p/word2vec/ . To address the issue,
