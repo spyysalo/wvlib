@@ -103,18 +103,14 @@ except ImportError:
     with_numarray = False
 
 from functools import partial
-from itertools import tee, izip, islice
-from StringIO import StringIO
-from types import StringTypes
+from itertools import tee, islice
+from io import StringIO
 from time import time
 from collections import defaultdict
 import struct
 import ast #for ast.literal_eval
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    from compat.ordereddict import OrderedDict
+from collections import OrderedDict
 
 try:
     from gmpy import popcount
@@ -249,7 +245,7 @@ class WVData(object):
         
         vs = [v1, v2]
         for i, v in enumerate(vs):
-            if isinstance(v, StringTypes):
+            if isinstance(v, str):
                 v = self.word_to_unit_vector(v)
             else:
                 v = v/numpy.linalg.norm(v) # costly but safe
@@ -295,7 +291,7 @@ class WVData(object):
 
         hashes = []
         for v in (v1, v2):
-            if isinstance(v, StringTypes):
+            if isinstance(v, str):
                 h = self._w2h_map[v]
             else:
                 h = self._w2h_lsh.hash(v)
@@ -314,7 +310,7 @@ class WVData(object):
         Return value is a list of (word, similarity) pairs.
         """
 
-        if isinstance(v, StringTypes):
+        if isinstance(v, str):
             v, w = self.word_to_unit_vector(v), v
         else:
             v, w = v/numpy.linalg.norm(v), None
@@ -325,7 +321,7 @@ class WVData(object):
         else:
             sim = partial(self._item_similarity_normalized, v=v)
         if candidates is None:
-            candidates = self.word_to_vector_mapping().iteritems()
+            candidates = self.word_to_vector_mapping().items()
         nearest = heapq.nlargest(n+len(exclude), candidates, sim)
         wordsim = [(p[0], sim(p)) for p in nearest if p[0] not in exclude]
         return wordsim[:n]
@@ -364,7 +360,7 @@ class WVData(object):
         if self._lsh is None or (bits is not None and bits != self._lsh.bits):
             self._lsh = self._initialize_lsh(bits)
 
-        if isinstance(v, StringTypes):
+        if isinstance(v, str):
             v, w = self.word_to_unit_vector(v), v
         else:
             v, w = v/numpy.linalg.norm(v), v
@@ -376,7 +372,7 @@ class WVData(object):
             # exact_eval nearest by hash similarity
             sim = partial(self._lsh.item_similarity, h=self._lsh.hash(v), 
                           bits=self._lsh.bits)
-            anearest = heapq.nlargest(exact_eval, self._lsh.iteritems(), sim)
+            anearest = heapq.nlargest(exact_eval, self._lsh.items(), sim)
             # nearest vectors for up to exact_eval of nearest hashes
             candidates = islice((wv for _, wvs in anearest for wv in wvs), 
                                 exact_eval)
@@ -505,7 +501,7 @@ class WVData(object):
         with open(name,"wb") as f:
             f.write("%d %d\n"%(to_save,len(vector_matrix[0])))
             for i in range(to_save):
-                if isinstance(words[i],unicode):
+                if isinstance(words[i],str):
                     f.write(words[i].encode("utf8"))
                 else:
                     f.write(words[i])
@@ -518,7 +514,7 @@ class WVData(object):
         words, vectors = self.words(), self.vectors()
         with open(name, 'wt') as f:
             for w, v in self:
-                print >> f, w, ' '.join(str(i) for i in v)
+                print(w, ' '.join(str(i) for i in v), file=f)
 
     def _invalidate(self):
         """Invalidate cached values."""
@@ -544,7 +540,7 @@ class WVData(object):
         """Iterate over (word, vector) pairs."""
 
         #return izip(self.vocab.words(), self._vectors)
-        return izip(self.vocab.iterwords(), iter(self._vectors))
+        return zip(self.vocab.iterwords(), iter(self._vectors))
 
     @classmethod
     def load(cls, name, max_rank=None):
@@ -869,7 +865,7 @@ class Vocabulary(object):
         self._rank = None
 
     def words(self):
-        return self.word_freq.keys()
+        return list(self.word_freq.keys())
 
     def rank(self, w):
         if self._rank is None:
@@ -880,13 +876,13 @@ class Vocabulary(object):
         """Discard words other than the first s."""
 
         self._invalidate()
-        self.word_freq = OrderedDict(islice(self.word_freq.iteritems(), s))
+        self.word_freq = OrderedDict(islice(self.word_freq.items(), s))
 
     def iterwords(self):
-        return self.word_freq.iterkeys()
+        return self.word_freq.keys()
 
     def to_rows(self):
-        return self.word_freq.iteritems()
+        return self.word_freq.items()
 
     def savef(self, f):
         """Save as TSV to file-like object f."""
@@ -934,7 +930,7 @@ class Vocabulary(object):
 
         rows = []
         for i, l in enumerate(f):
-            l=unicode(l,encoding)
+            l = l.decode(encoding)
             if max_rank is not None and i >= max_rank:
                 break
             l = l.rstrip()
@@ -944,7 +940,7 @@ class Vocabulary(object):
                                      (len(row), l))
             try:
                 row[1] = int(row[1])
-            except ValueError, e:
+            except ValueError as e:
                 raise TypeError('expected int, got %s' % row[1])
             rows.append(row)
         return cls.from_rows(rows)
@@ -997,7 +993,7 @@ class Config(object):
                        int(d['word_count']), 
                        int(d['vector_dim']),
                        d['format'])
-        except KeyError, e:
+        except KeyError as e:
             raise ConfigError('missing %s' % str(e))
 
     @classmethod
@@ -1006,7 +1002,7 @@ class Config(object):
 
         try:
             config = json.load(f)
-        except ValueError, e:
+        except ValueError as e:
             raise ConfigError(e)
         return cls.from_dict(config)
 
@@ -1328,9 +1324,9 @@ class RandomHyperplaneLSH(object):
 
         If v1/v2 is a vector, hash before calculating similarity."""
 
-        if not isinstance(v1, (int, long)):
+        if not isinstance(v1, int):
             v1 = self.hash(v1)
-        if not isinstance(v2, (int, long)):
+        if not isinstance(v2, int):
             v2 = self.hash(v2)
         return self.hash_similarity(v1, v2)
 
@@ -1353,7 +1349,7 @@ class RandomHyperplaneLSH(object):
 
         if min_dist < 0:
             raise ValueError('min_dist must be >= 0')
-        if not isinstance(h, (int, long)):
+        if not isinstance(h, int):
             h = self.hash(h)        
         i = 0
         for distance in range(min_dist, self.bits):
@@ -1368,10 +1364,10 @@ class RandomHyperplaneLSH(object):
         return float(self._entries)/2**self.bits
 
     def iteritems(self, max_items=None):
-        return self._values.iteritems()
+        return iter(self._values.items())
 
     def add(self, key, value):
-        if not isinstance(key, (int, long)):
+        if not isinstance(key, int):
             key = self.hash(key)
         if key not in self._values:
             self._values[key] = []
@@ -1379,7 +1375,7 @@ class RandomHyperplaneLSH(object):
         self._entries += 1
 
     def __getitem__(self, key):
-        if not isinstance(key, (int, long)):
+        if not isinstance(key, int):
             key = self.hash(key)
         return self._values.get(key, [])
 
@@ -1445,7 +1441,7 @@ def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = tee(iterable)
     next(b, None)
-    return izip(a, b)
+    return zip(a, b)
 
 def duplicates(iterable):
     seen, dups = set(), set()
