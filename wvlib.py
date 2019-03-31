@@ -1191,8 +1191,12 @@ class Word2VecData(WVData):
     def read_size_line(f):
         """Read line from file-like object f as word2vec format
         header, return (word count, vector size)."""
-        
-        l = f.readline().rstrip('\n')
+
+        l = f.readline()
+        try:
+            l = l.rstrip('\n')
+        except TypeError:
+            l = l.rstrip(bytes('\n', encoding='utf-8'))    # binary file
         try:
             wcount, vsize = l.split()
             return int(wcount), int(vsize)
