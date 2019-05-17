@@ -1228,12 +1228,15 @@ class Word2VecData(WVData):
         wchars = []
         while True:
             c = f.read(1)
-            if c == ' ':
+            if c in (' ', b' '):
                 break
             if not c:
                 raise FormatError("premature end of file")
             wchars.append(c)
-        return ''.join(wchars)
+        if 'b' in f.mode:
+            return b''.join(wchars).decode('utf-8')    # binary
+        else:
+            return ''.join(wchars)
 
     @staticmethod
     def read_binary_line(f, vsize):
@@ -1268,7 +1271,11 @@ class Word2VecData(WVData):
         if max_rank is not None and wcount > max_rank:
             wcount = max_rank
         for i in range(wcount):
-            rows.append(read_line(f, vsize))
+            try:
+                rows.append(read_line(f, vsize))
+            except:
+                print('read failed on line {}'.format(i+1), file=sys.stderr)
+                raise
         if len(rows) != wcount:
             raise FormatError('expected %d words, got %d' % (wcount, len(rows)))
         return rows
