@@ -36,8 +36,8 @@ def main(argv=None):
     try:
         wv = wvlib.load(options.vectors, max_rank=options.max_rank)
         wv = wv.normalize()
-    except Exception, e:
-        print >> sys.stderr, 'Error: %s' % str(e)
+    except Exception as e:
+        print('Error: %s' % str(e), file=sys.stderr)
         return 1
     return query_loop(wv, options, process_query, query_count=3)
 

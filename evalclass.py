@@ -51,7 +51,7 @@ def read_words(fn, encoding=ENCODING):
         for l in f:
             w = l.rstrip()
             if ' ' in w:
-                print >> sys.stderr, 'Skip multiword: "%s"' % w
+                print('Skip multiword: "%s"' % w, file=sys.stderr)
                 continue
             words.append(w)
     return words
@@ -71,7 +71,8 @@ def read_wordsets(fns):
 def enough_data(wordsets):
     assert not any(s for s in wordsets if len(s) == 0), 'empty set'
     if len(wordsets) < 2:
-        print >> sys.stderr, 'error: at least two non-empty word sets required'
+        print('error: at least two non-empty word sets required',
+              file=sys.stderr)
         argparser().print_help()
         return False
     else:
@@ -108,14 +109,14 @@ def compare_sets(set1, name1, set2, name2, w2v, options=None):
                 correct += score(w1, w2, w, w2v, SECOND)
                 total += 1
     if not total:
-        print >> sys.stderr, '%s - %s: No comparisons succeeded!' % \
-            (name1, name2)
+        print('%s - %s: No comparisons succeeded!' % \
+              (name1, name2), file=sys.stderr)
         return None
     else:
         avg = 1.*correct/total
         if not options or not options.quiet:
-            print 'AVERAGE %s - %s: %.2f%% (%d/%d)' % \
-                (name1, name2, 100*avg, correct, total)
+            print('AVERAGE %s - %s: %.2f%% (%d/%d)' % \
+                  (name1, name2, 100*avg, correct, total))
         return avg
         
 def main(argv=None):
@@ -145,13 +146,13 @@ def main(argv=None):
             if w in w2v:
                 filtered.append(w)
             else:
-                logging.warn('ignoring out-of-vocabulary word "%s"' % w)
+                logging.warning('ignoring out-of-vocabulary word "%s"' % w)
                 oov_count += 1
             word_count += 1
         if filtered:
             filtered_wordsets[k] = filtered
         else:
-            logging.warn('wordset %s empty after OOV filtering, removing' % k)
+            logging.warning('wordset %s empty after OOV filtering, removing' % k)
     wordsets = filtered_wordsets
             
     if not enough_data(wordsets):
@@ -164,14 +165,15 @@ def main(argv=None):
             results.append(result)
 
     if not options.quiet:
-        print >> sys.stderr, 'out of vocabulary %d/%d (%.2f%%)' % \
-            (oov_count, word_count, 100.*oov_count/word_count)
+        print('out of vocabulary %d/%d (%.2f%%)' % \
+              (oov_count, word_count, 100.*oov_count/word_count),
+              file=sys.stderr)
 
     if results:
-        print 'OVERALL AVERAGE (macro):\t%.2f%%\t(%.2f%% OOV)' % \
-            (100*sum(results)/len(results), 100.*oov_count/word_count)
+        print('OVERALL AVERAGE (macro):\t%.2f%%\t(%.2f%% OOV)' % \
+              (100*sum(results)/len(results), 100.*oov_count/word_count))
     else:
-        print >> sys.stderr, 'All comparisons failed!'
+        print('All comparisons failed!', file=sys.stderr)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))

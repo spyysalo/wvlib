@@ -179,8 +179,8 @@ def report(TPp, TPg, FP, FN, header=None, out=sys.stdout):
     p, r, F = prec_rec_F(TPp, TPg, FP, FN)
     if header is not None:
         out.write(header)
-    print >> out, "precision %.2f%% (%d/%d) recall %.2f%% (%d/%d) F %.2f%%" % \
-        (p, TPp, TPp+FP, r, TPg, TPg+FN, F)
+    print("precision %.2f%% (%d/%d) recall %.2f%% (%d/%d) F %.2f%%" % \
+          (p, TPp, TPp+FP, r, TPg, TPg+FN, F), file=out)
 
 def evaluate_set(queries, targets, accept, setname, nearest, options):
     tTPp, tTPg, tFP, tFN = 0, 0, 0, 0
@@ -336,7 +336,7 @@ def main(argv=None):
         word_sets.append((targets, accept, name))
 
     avg_F = evaluate_sets(infn, word_sets, options)
-    print 'OVERALL AVERAGE:\t%.2f%%\t(F-score)' % avg_F
+    print('OVERALL AVERAGE:\t%.2f%%\t(F-score)' % avg_F)
 
     return 0
 

@@ -104,7 +104,7 @@ except ImportError:
 
 from functools import partial
 from itertools import tee, islice
-from io import StringIO
+from io import BytesIO, StringIO
 from time import time
 from collections import defaultdict
 import struct
@@ -813,7 +813,13 @@ class Vectors(object):
                 # for partial load will no longer work
                 logging.warning('no numpy.numarray, -r disabled for numpy data')
                 # TODO: reshape anyway
-            v = cls(numpy.load(f))
+
+            # hack around numpy failing to load from _FileInFile, see
+            # https://github.com/numpy/numpy/issues/7989#issuecomment-340921579
+            tmp = BytesIO()
+            tmp.write(f.read())
+            tmp.seek(0)
+            v = cls(numpy.load(tmp))
         return v
 
     @classmethod

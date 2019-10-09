@@ -44,7 +44,7 @@ def process_args(args, prompt='Enter words'):
 
 def get_line(prompt, exit_word=None):
     try:
-        s = raw_input(prompt)
+        s = input(prompt)
     except KeyboardInterrupt:   # CTRL-C
         raise EOFError
     if s.strip() == exit_word:
@@ -98,20 +98,20 @@ def query_loop(wv, options, process_query, query_count=1):
         if empty_query(query):
             continue
         if options.echo:
-            print query
+            print(query)
         if len(query) < query_count:
-            print >> sys.stderr, 'Enter %d words/phrases' % query_count
+            print('Enter %d words/phrases' % query_count, file=sys.stderr)
             continue
         if len(query) > query_count:
-            print >> sys.stderr, 'Ignoring extra words/phrases'
+            print('Ignoring extra words/phrases', file=sys.stderr)
             query = query[:query_count]
         words, missing = [w for q in query for w in q], []
         for w in uniq(words):
             if w not in wv:
-                print >> sys.stderr, 'Out of dictionary word: %s' % str(w)
+                print('Out of dictionary word: %s' % str(w), file=sys.stderr)
                 missing.append(w)
             elif not options.quiet:
-                print 'Word: %s  Position in vocabulary: %d' % (w, wv.rank(w))
+                print('Word: %s  Position in vocabulary: %d' % (w, wv.rank(w)))
         if not missing:
             process_query(wv, query, options)
 
@@ -119,10 +119,10 @@ def output_nearest(nearest, options, out=sys.stdout):
     # word2vec distance.c output header
     output_header = '\n'+46*' '+'Word       Cosine distance\n'+72*'-'
     if not options.quiet:
-        print >> out, output_header
+        print(output_header, file=out)
         fmt = '%50s\t\t%f'
     else:
         fmt = '%s\t%f'
     for w, s in nearest:
-        print >> out, fmt % (w, s)
-    print >> out
+        print(fmt % (w, s), file=out)
+    print(file=out)
