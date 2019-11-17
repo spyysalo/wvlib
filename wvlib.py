@@ -161,7 +161,7 @@ NUMPY_FORMAT = 'npy'
 TSV_FORMAT = 'tsv'
 
 formats = sorted(list(set(extension_format_map.values())))
-output_formats = sorted([WVLIB_FORMAT, WORD2VEC_BIN, SDV_FORMAT])
+output_formats = sorted([WVLIB_FORMAT, WORD2VEC_BIN, SDV_FORMAT, WORD2VEC_TEXT])
 vector_formats = sorted([NUMPY_FORMAT, TSV_FORMAT])
 
 class FormatError(Exception):
@@ -451,6 +451,8 @@ class WVData(object):
                 return self.save_bin(name)
             elif format == SDV_FORMAT:
                 return self.save_sdv(name)
+            elif format == WORD2VEC_TEXT:
+                return self.save_w2v_text(name)
             else:
                 raise NotImplementedError
         finally:
@@ -515,6 +517,14 @@ class WVData(object):
         with open(name, 'wt') as f:
             for w, v in self:
                 print(w, ' '.join(str(i) for i in v), file=f)
+
+    def save_w2v_text(self, name, numformat=".6f"):
+        """ Use "g" for a general number format - this can produce 1e-17. Use ".6f" for 0.XXXXXX """
+        words, vectors = self.words(), self.vectors()
+        with open(name, 'wt') as f:
+            print >> f, "%d %d"%(len(vectors),len(vectors[0]))
+            for w, v in self:
+                print >> f, w, ' '.join(("{:"+numformat+"}").format(i) for i in v)
 
     def _invalidate(self):
         """Invalidate cached values."""
